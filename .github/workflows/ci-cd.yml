@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ main, develop, feature/*, agent/** ]
   pull_request:
     branches: [ main, develop ]
 
@@ -19,8 +19,7 @@ jobs:
 
     strategy:
       matrix:
-        # حذفنا 16.x — وصل نهاية الدعم (EOL) وهذا سبب أحد تنبيهات الأمان؛
-        # 18.x و20.x كافيين للتأكد من التوافق بدون استخدام إصدار غير مدعوم.
+        # اختبر فقط على إصدارات Node المدعومة المستخدمة في الإنتاج.
         node-version: [20.x, 22.x]
         # المشروع مقسوم لمجلدين منفصلين، كل واحد فيه package.json خاص به —
         # لا يوجد package.json بجذر المستودع. هذا هو سبب فشل ٣ من ٨ فحوصات
@@ -55,10 +54,6 @@ jobs:
       # --if-present لأن الباك إند (Node/Express) ما له سكربت "build" أصلاً
       # (سكربتاته فقط dev/start) — فقط الفرونت إند (Vite) يبني فعلياً.
       run: npm run build --if-present
-
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v5
-      if: matrix.node-version == '18.x' && matrix.project == 'frontend'
 
   security-scan:
     runs-on: ubuntu-latest
