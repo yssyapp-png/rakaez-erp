@@ -56,6 +56,11 @@ export default function AdminView() {
   return (
     <div>
       <TrialBanner org={org} t={t} />
+      {org?.login_code && (
+        <div style={{ background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 8, padding: 12, marginBottom: 16 }}>
+          {t("organization_code")}: <b dir="ltr">{org.login_code}</b>
+        </div>
+      )}
       <DeviceManagement branches={branches} devices={devices} onDevicesChanged={() => getDevices().then(setDevices)} />
       <SaudiCatalogImport />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>

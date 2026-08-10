@@ -2,19 +2,13 @@ import React, { useState } from "react";
 import { login, register } from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
-// The demo tenant seeded by seed.sql — used as the default "join this shop"
-// target when a customer/seller signs up without specifying one. In a real
-// multi-shop deployment this would come from a shop-specific signup link
-// (e.g. rakaez.app/shop/riyadh-auto or a QR code the shop hands out), not a
-// hardcoded id.
-const DEFAULT_DEMO_ORG_ID = 1;
-
 export default function LoginView({ onLoggedIn }) {
   const { t } = useLanguage();
-  const [mode, setMode] = useState("login"); // 'login' | 'join' | 'new-shop'
+  const [mode, setMode] = useState("login"); // 'login' | 'new-shop'
   const [name, setName] = useState("");
   const [businessName, setBusinessName] = useState("");
-  const [email, setEmail] = useState("seller1@example.com");
+  const [email, setEmail] = useState("");
+  const [organizationCode, setOrganizationCode] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,9 +20,7 @@ export default function LoginView({ onLoggedIn }) {
     try {
       let data;
       if (mode === "login") {
-        data = await login(email, password);
-      } else if (mode === "join") {
-        data = await register({ name, email, password, role: "customer", organizationId: DEFAULT_DEMO_ORG_ID });
+        data = await login(email, password, organizationCode);
       } else {
         // new-shop: creates a brand-new organization (tenant) with this user as its first admin
         data = await register({ name, email, password, role: "admin", businessName });
@@ -67,7 +59,7 @@ export default function LoginView({ onLoggedIn }) {
         </div>
       )}
 
-      {(mode === "join" || mode === "new-shop") && (
+      {mode === "new-shop" && (
         <input className="rk-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("full_name")} />
       )}
       {mode === "new-shop" && (
@@ -79,6 +71,15 @@ export default function LoginView({ onLoggedIn }) {
         />
       )}
       <input className="rk-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("email")} />
+      {mode === "login" && (
+        <input
+          className="rk-input"
+          value={organizationCode}
+          onChange={(e) => setOrganizationCode(e.target.value.toUpperCase())}
+          placeholder={t("organization_code")}
+          autoComplete="organization"
+        />
+      )}
       <input
         className="rk-input"
         type="password"
@@ -97,18 +98,13 @@ export default function LoginView({ onLoggedIn }) {
             {t("have_account")}
           </a>
         )}
-        {mode !== "join" && (
-          <a className="rk-link" onClick={() => setMode("join")}>
-            {t("new_customer")}
-          </a>
-        )}
         {mode !== "new-shop" && (
           <a className="rk-link" style={{ color: "#166534" }} onClick={() => setMode("new-shop")}>
             {t("shop_owner")}
           </a>
         )}
       </div>
-      <div style={{ fontSize: 12, color: "#6b5a3f", textAlign: "center" }}>{t("demo_accounts")}</div>
+      {mode === "login" && <div style={{ fontSize: 12, color: "#6b5a3f", textAlign: "center" }}>{t("organization_code_hint")}</div>}
     </form>
   );
 }

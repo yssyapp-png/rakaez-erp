@@ -9,11 +9,11 @@ function authHeaders() {
   };
 }
 
-export async function login(email, password, organizationId) {
+export async function login(email, password, organizationCode) {
   const res = await fetch(`${BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, organizationId }),
+    body: JSON.stringify({ email, password, organizationCode }),
   });
   const data = await res.json();
   if (data.token) localStorage.setItem("token", data.token);

@@ -13,6 +13,8 @@ const migrationFiles = [
   "migration_devices_and_inventory_audit.sql",
   "migration_global_catalog.sql",
   "migration_customer_vehicles.sql",
+  "migration_tenant_login_codes.sql",
+  "migration_api_surface_security.sql",
 ];
 
 const client = await pool.connect();

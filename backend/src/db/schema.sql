@@ -12,6 +12,7 @@
 CREATE TABLE organizations (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,                 -- shop/company display name
+  login_code TEXT NOT NULL UNIQUE,    -- required at login to select the tenant safely
   vat_number TEXT,                    -- needed on every ZATCA invoice QR
   plan TEXT NOT NULL DEFAULT 'professional', -- basic | professional | business — see PLAN_PRICES in billing.js
   plan_price_sar NUMERIC(10,2) NOT NULL DEFAULT 349,
@@ -257,5 +258,28 @@ CREATE INDEX idx_invoices_org ON invoices(organization_id);
 CREATE INDEX idx_invites_org_email ON organization_invites(organization_id, email);
 CREATE INDEX idx_devices_org_branch ON organization_devices(organization_id, branch_id);
 CREATE INDEX idx_inventory_movements_org_created ON inventory_movements(organization_id, created_at DESC);
+
+-- Supabase exposes the public schema through PostgREST. Rakaez uses only its
+-- server-side API, so browser roles must never access these tables directly.
+DO $$
+DECLARE
+  table_name TEXT;
+  protected_tables TEXT[] := ARRAY[
+    'organizations', 'branches', 'parts', 'suppliers', 'part_suppliers',
+    'vehicle_applications', 'catalog_import_runs', 'inventory', 'vin_map',
+    'users', 'customer_vehicles', 'organization_invites',
+    'organization_devices', 'device_pairing_codes', 'inventory_movements',
+    'invoices', 'invoice_items'
+  ];
+BEGIN
+  FOREACH table_name IN ARRAY protected_tables LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', table_name);
+    EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM anon, authenticated', table_name);
+  END LOOP;
+END $$;
+
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
 CREATE INDEX idx_inventory_part ON inventory(part_id);
 CREATE INDEX idx_vin_map_pattern ON vin_map(vin_pattern);

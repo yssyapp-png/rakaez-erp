@@ -116,7 +116,7 @@ router.get("/inventory-movements", async (req, res) => {
 /** GET /api/admin/organization — the tenant's own profile + subscription status */
 router.get("/organization", async (req, res) => {
   const r = await pool.query(
-    `SELECT id, name, vat_number, plan, plan_price_sar, trial_ends_at,
+    `SELECT id, name, login_code, vat_number, plan, plan_price_sar, trial_ends_at,
             subscription_status, next_billing_at, billing_interval, created_at,
             (moyasar_card_token IS NOT NULL) AS has_payment_method
      FROM organizations WHERE id = $1`,

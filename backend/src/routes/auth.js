@@ -41,18 +41,21 @@ router.post("/register", async (req, res) => {
     await client.query("BEGIN");
 
     let orgId = organizationId;
+    let newOrganizationCode;
 
     if (role === "admin") {
       if (!businessName) {
         await client.query("ROLLBACK");
         return res.status(400).json({ error: "missing_business_name" });
       }
+      const loginCode = `RKZ-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
       const orgRes = await client.query(
-        `INSERT INTO organizations (name, plan, subscription_status, trial_ends_at)
-         VALUES ($1, 'professional', 'trialing', now() + interval '14 days') RETURNING id`,
-        [businessName]
+        `INSERT INTO organizations (name, login_code, plan, subscription_status, trial_ends_at)
+         VALUES ($1, $2, 'professional', 'trialing', now() + interval '14 days') RETURNING id, login_code`,
+        [businessName, loginCode]
       );
       orgId = orgRes.rows[0].id;
+      newOrganizationCode = orgRes.rows[0].login_code;
 
       // give the new tenant one default branch so the app isn't empty on first login
       const branchRes = await client.query(
@@ -87,7 +90,7 @@ router.post("/register", async (req, res) => {
       JWT_SECRET,
       { expiresIn: "7d" }
     );
-    res.json({ user, token });
+    res.json({ user, token, organizationCode: newOrganizationCode });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error(err);
@@ -109,13 +112,19 @@ router.post("/register", async (req, res) => {
  * do you work at?" screen) before login.
  */
 router.post("/login", async (req, res) => {
-  const { email, password, organizationId } = req.body;
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const password = String(req.body.password || "");
+  const organizationCode = String(req.body.organizationCode || "").trim().toUpperCase();
+  if (!email || !password || !organizationCode) {
+    return res.status(400).json({ error: "missing_login_fields" });
+  }
   try {
-    const query = organizationId
-      ? "SELECT * FROM users WHERE email = $1 AND organization_id = $2"
-      : "SELECT * FROM users WHERE email = $1 ORDER BY id LIMIT 1";
-    const params = organizationId ? [email, organizationId] : [email];
-    const result = await pool.query(query, params);
+    const result = await pool.query(
+      `SELECT u.* FROM users u
+       JOIN organizations o ON o.id = u.organization_id
+       WHERE lower(u.email) = $1 AND upper(o.login_code) = $2`,
+      [email, organizationCode]
+    );
     const user = result.rows[0];
     if (!user || !user.password_hash) {
       return res.status(401).json({ error: "invalid_credentials" });

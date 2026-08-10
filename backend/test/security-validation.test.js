@@ -5,6 +5,7 @@ import { hasValidItems } from "../src/routes/sales.js";
 import { subscriptionAllowsAccess } from "../src/routes/auth.js";
 import { SAUDI_STARTER_CATALOG } from "../src/routes/catalog.js";
 import { normalizeVin } from "../src/routes/vehicles.js";
+import fs from "node:fs/promises";
 
 test("money values reject negative and non-numeric input", () => {
   assert.equal(isNonNegativeMoney(0), true);
@@ -48,4 +49,20 @@ test("subscription access allows active and unexpired trials only", () => {
   assert.equal(subscriptionAllowsAccess("trialing", "2026-08-09T00:00:00Z", now), false);
   assert.equal(subscriptionAllowsAccess("past_due", null, now), false);
   assert.equal(subscriptionAllowsAccess("canceled", null, now), false);
+});
+
+test("Supabase API security migration enables RLS and revokes browser roles", async () => {
+  const sql = await fs.readFile(new URL("../src/db/migration_api_surface_security.sql", import.meta.url), "utf8");
+  assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(sql, /REVOKE ALL PRIVILEGES ON TABLE[^;]+anon, authenticated/);
+  for (const table of ["organizations", "users", "parts", "inventory", "invoices", "organization_invites"]) {
+    assert.match(sql, new RegExp(`['\"]${table}['\"]`));
+  }
+});
+
+test("tenant login requires an organization code and never selects the first matching email", async () => {
+  const source = await fs.readFile(new URL("../src/routes/auth.js", import.meta.url), "utf8");
+  assert.match(source, /missing_login_fields/);
+  assert.match(source, /upper\(o\.login_code\) = \$2/);
+  assert.doesNotMatch(source, /ORDER BY id LIMIT 1/);
 });
