@@ -3,8 +3,23 @@ import { pool } from "../db/pool.js";
 import { requireRole } from "./auth.js";
 import { buildZatcaQrBase64 } from "../utils/zatca.js";
 import { createMoyasarPayment, refundMoyasarPayment } from "../utils/moyasar.js";
+import { deviceRequired } from "./devices.js";
 
 const router = Router();
+
+export function hasValidItems(items) {
+  return Array.isArray(items) && items.length > 0 && items.every(
+    (item) => typeof item.partId === "string" && item.partId.trim() && Number.isInteger(Number(item.quantity)) && Number(item.quantity) > 0
+  );
+}
+
+async function requireOwnedBranch(client, branchId, orgId) {
+  const result = await client.query(
+    "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+    [branchId, orgId]
+  );
+  return Boolean(result.rows[0]);
+}
 
 async function getOrganization(client, orgId) {
   const r = await client.query("SELECT * FROM organizations WHERE id = $1", [orgId]);
@@ -32,17 +47,21 @@ async function findPartId(client, orgId, partNumber) {
  * user (req.user) — never trust these from the request body, or a seller
  * at one shop could invoice against another shop's branch/inventory.
  */
-router.post("/checkout", requireRole("seller", "admin"), async (req, res) => {
+router.post("/checkout", requireRole("seller", "admin"), deviceRequired, async (req, res) => {
   const { items } = req.body;
   const orgId = req.user.organizationId;
   const sellerId = req.user.id;
-  const branchId = req.body.branchId || req.user.branchId;
+  const branchId = req.device.branch_id;
   if (!branchId) return res.status(400).json({ error: "missing_branch" });
-  if (!items?.length) return res.status(400).json({ error: "empty_cart" });
+  if (!hasValidItems(items)) return res.status(400).json({ error: "invalid_items" });
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (!(await requireOwnedBranch(client, branchId, orgId))) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "branch_not_found" });
+    }
 
     let subtotal = 0;
     const resolvedItems = [];
@@ -88,6 +107,12 @@ router.post("/checkout", requireRole("seller", "admin"), async (req, res) => {
          VALUES ($1,$2,$3,$4)`,
         [invoice.id, item.id, item.quantity, item.price]
       );
+      await client.query(
+        `INSERT INTO inventory_movements
+         (organization_id, branch_id, part_id, device_id, performed_by, movement_type, quantity_change, reference_type, reference_id)
+         VALUES ($1,$2,$3,$4,$5,'sale',$6,'invoice',$7)`,
+        [orgId, branchId, item.id, req.device.id, sellerId, -item.quantity, String(invoice.id)]
+      );
     }
 
     await client.query("COMMIT");
@@ -111,14 +136,20 @@ router.post("/checkout", requireRole("seller", "admin"), async (req, res) => {
  * from, so an invoice can be attributed to someone within that shop's data.
  */
 router.post("/checkout-online", async (req, res) => {
+  if (process.env.PAYMENTS_ENABLED !== "true") {
+    return res.status(503).json({ error: "payments_temporarily_disabled" });
+  }
   const { branchId, items, moyasarToken } = req.body;
   const orgId = req.user.organizationId;
-  if (!items?.length) return res.status(400).json({ error: "empty_cart" });
+  if (!hasValidItems(items)) return res.status(400).json({ error: "invalid_items" });
   if (!branchId) return res.status(400).json({ error: "missing_branch" });
   if (!moyasarToken) return res.status(400).json({ error: "missing_payment_token" });
 
   const client = await pool.connect();
   try {
+    if (!(await requireOwnedBranch(client, branchId, orgId))) {
+      return res.status(404).json({ error: "branch_not_found" });
+    }
     // price everything first (read-only) so we know the exact amount to charge
     let subtotal = 0;
     const resolvedItems = [];
@@ -168,9 +199,9 @@ router.post("/checkout-online", async (req, res) => {
       });
 
       const invoiceRes = await client.query(
-        `INSERT INTO invoices (organization_id, invoice_number, branch_id, seller_id, subtotal, vat, total, zatca_status, zatca_qr, payment_status, payment_reference)
-         VALUES ($1,$2,$3,NULL,$4,$5,$6,'generated_locally',$7,'paid',$8) RETURNING *`,
-        [orgId, invoiceNumber, branchId, subtotal, vat, total, zatcaQr, payment.id]
+        `INSERT INTO invoices (organization_id, invoice_number, branch_id, seller_id, customer_id, subtotal, vat, total, zatca_status, zatca_qr, payment_status, payment_reference)
+         VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,'generated_locally',$8,'paid',$9) RETURNING *`,
+        [orgId, invoiceNumber, branchId, req.user.id, subtotal, vat, total, zatcaQr, payment.id]
       );
       const invoice = invoiceRes.rows[0];
 
@@ -204,12 +235,16 @@ router.post("/checkout-online", async (req, res) => {
 });
 
 router.get("/invoices", async (req, res) => {
+  const customerFilter = req.user.role === "customer" ? "AND i.customer_id = $2" : "";
+  const params = req.user.role === "customer"
+    ? [req.user.organizationId, req.user.id]
+    : [req.user.organizationId];
   const r = await pool.query(
     `SELECT i.*, b.name AS branch_name
      FROM invoices i JOIN branches b ON b.id = i.branch_id
-     WHERE i.organization_id = $1
+     WHERE i.organization_id = $1 ${customerFilter}
      ORDER BY created_at DESC LIMIT 50`,
-    [req.user.organizationId]
+    params
   );
   res.json(r.rows);
 });

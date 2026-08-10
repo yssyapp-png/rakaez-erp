@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "migrate": "node scripts/migrate.js",
+    "test": "JWT_SECRET=test-secret-with-at-least-32-characters node --test"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

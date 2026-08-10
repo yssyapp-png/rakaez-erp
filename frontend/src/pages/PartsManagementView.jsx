@@ -62,6 +62,12 @@ export default function PartsManagementView() {
     refresh();
   }
 
+  async function onActivate(part) {
+    const result = await updatePart(part.id, { catalogStatus: "active" });
+    setMessage(result.error ? { type: "error", text: result.error } : { type: "success", text: "تم تفعيل القطعة" });
+    refresh();
+  }
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -129,6 +135,7 @@ export default function PartsManagementView() {
                 ))}
               </td>
               <td style={{ padding: 8 }}>
+                {part.catalog_status === "draft" && <button className="rk-btn-outline" onClick={() => onActivate(part)}>تفعيل</button>}
                 <a style={{ cursor: "pointer", color: "#3b82f6", marginInlineEnd: 8 }} onClick={() => setEditing(part)}>
                   {t("edit")}
                 </a>

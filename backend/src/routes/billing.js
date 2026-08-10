@@ -44,6 +44,9 @@ router.get("/status", async (req, res) => {
  * yearly billing at that point.
  */
 router.post("/activate-subscription", requireRole("admin"), async (req, res) => {
+  if (process.env.PAYMENTS_ENABLED !== "true") {
+    return res.status(503).json({ error: "payments_temporarily_disabled" });
+  }
   const { moyasarToken, interval } = req.body;
   if (!moyasarToken) return res.status(400).json({ error: "missing_payment_token" });
   const billingInterval = interval === "yearly" ? "yearly" : "monthly";

@@ -4,6 +4,7 @@ import MoyasarCheckout from "../components/MoyasarCheckout.jsx";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 export default function BillingView() {
+  const paymentsEnabled = import.meta.env.VITE_PAYMENTS_ENABLED === "true";
   const { t } = useLanguage();
   const [status, setStatus] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -116,7 +117,12 @@ export default function BillingView() {
         </div>
       )}
 
-      {!status.has_payment_method && !showForm && (
+      {!paymentsEnabled && (
+        <div style={{ padding: 12, borderRadius: 8, background: "#fffbeb", border: "1px solid #fcd34d" }}>
+          الدفع الإلكتروني غير مفعّل في النسخة التجريبية. لن يتم خصم أي مبلغ.
+        </div>
+      )}
+      {paymentsEnabled && !status.has_payment_method && !showForm && (
         <div>
           <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{t("choose_cycle")}</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -161,7 +167,7 @@ export default function BillingView() {
         </div>
       )}
 
-      {showForm && (
+      {paymentsEnabled && showForm && (
         <div>
           <p style={{ fontSize: 12, color: "#777" }}>
             {t(interval === "yearly" ? "yearly_charge_notice" : "monthly_charge_notice", { amount: chosenAmount.toFixed(2) })}

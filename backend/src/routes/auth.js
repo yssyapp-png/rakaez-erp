@@ -1,10 +1,14 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { pool } from "../db/pool.js";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error("JWT_SECRET must be configured with at least 32 characters");
+}
 
 /**
  * POST /api/auth/register
@@ -26,8 +30,10 @@ router.post("/register", async (req, res) => {
   if (!name || !email || !password) {
     return res.status(400).json({ error: "missing_fields" });
   }
-  if (role !== "admin" && !organizationId) {
-    return res.status(400).json({ error: "missing_organization" });
+  // Public registration creates a brand-new tenant owner only. Joining an
+  // existing tenant must go through the authenticated invitation flow.
+  if (role !== "admin" || organizationId || branchId) {
+    return res.status(403).json({ error: "invitation_required" });
   }
 
   const client = await pool.connect();
@@ -36,7 +42,7 @@ router.post("/register", async (req, res) => {
 
     let orgId = organizationId;
 
-    if (role === "admin" && !organizationId) {
+    if (role === "admin") {
       if (!businessName) {
         await client.query("ROLLBACK");
         return res.status(400).json({ error: "missing_business_name" });
@@ -54,12 +60,6 @@ router.post("/register", async (req, res) => {
         [orgId]
       );
       req._defaultBranchId = branchRes.rows[0].id;
-    } else {
-      const orgCheck = await client.query("SELECT id FROM organizations WHERE id = $1", [orgId]);
-      if (!orgCheck.rows.length) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({ error: "organization_not_found" });
-      }
     }
 
     const existing = await client.query(
@@ -145,9 +145,81 @@ router.post("/login", async (req, res) => {
   }
 });
 
+/** POST /api/auth/accept-invitation — creates an account from a one-time invite. */
+router.post("/accept-invitation", async (req, res) => {
+  const token = String(req.body.token || "");
+  const name = String(req.body.name || "").trim();
+  const password = String(req.body.password || "");
+  if (!token || !name || password.length < 8) {
+    return res.status(400).json({ error: "invalid_invitation_signup" });
+  }
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const inviteResult = await client.query(
+      `SELECT * FROM organization_invites
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+       FOR UPDATE`,
+      [tokenHash]
+    );
+    const invite = inviteResult.rows[0];
+    if (!invite) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "invitation_invalid_or_expired" });
+    }
+    const existing = await client.query(
+      "SELECT id FROM users WHERE organization_id = $1 AND lower(email) = lower($2)",
+      [invite.organization_id, invite.email]
+    );
+    if (existing.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "email_taken" });
+    }
+    const hash = await bcrypt.hash(password, 12);
+    const userResult = await client.query(
+      `INSERT INTO users (organization_id, name, role, branch_id, email, password_hash)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING id, organization_id, name, role, branch_id, email`,
+      [invite.organization_id, name, invite.role, invite.branch_id, invite.email, hash]
+    );
+    await client.query("UPDATE organization_invites SET used_at = now() WHERE id = $1", [invite.id]);
+    await client.query("COMMIT");
+    const user = userResult.rows[0];
+    const jwtToken = jwt.sign(
+      { id: user.id, role: user.role, branchId: user.branch_id, organizationId: user.organization_id },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.status(201).json({ user, token: jwtToken });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: "invitation_accept_failed" });
+  } finally {
+    client.release();
+  }
+});
+
 /** GET /api/auth/me — requires Authorization: Bearer <token> */
 router.get("/me", authRequired, async (req, res) => {
-  res.json({ user: req.user });
+  const result = await pool.query(
+    `SELECT id, organization_id, name, role, branch_id, email
+     FROM users WHERE id = $1 AND organization_id = $2`,
+    [req.user.id, req.user.organizationId]
+  );
+  const row = result.rows[0];
+  if (!row) return res.status(401).json({ error: "user_not_found" });
+  res.json({
+    user: {
+      id: row.id,
+      organizationId: row.organization_id,
+      name: row.name,
+      role: row.role,
+      branchId: row.branch_id,
+      email: row.email,
+    },
+  });
 });
 
 /** PUT /api/auth/me — update the logged-in user's own name. */
@@ -201,6 +273,28 @@ export function requireRole(...roles) {
     }
     next();
   };
+}
+
+export function subscriptionAllowsAccess(subscriptionStatus, trialEndsAt, now = new Date()) {
+  if (subscriptionStatus === "active") return true;
+  return subscriptionStatus === "trialing" && trialEndsAt && new Date(trialEndsAt) > now;
+}
+
+export async function requireActiveSubscription(req, res, next) {
+  try {
+    const result = await pool.query(
+      "SELECT subscription_status, trial_ends_at FROM organizations WHERE id = $1",
+      [req.user.organizationId]
+    );
+    const organization = result.rows[0];
+    if (!organization || !subscriptionAllowsAccess(organization.subscription_status, organization.trial_ends_at)) {
+      return res.status(402).json({ error: "subscription_required" });
+    }
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(503).json({ error: "subscription_check_failed" });
+  }
 }
 
 export default router;

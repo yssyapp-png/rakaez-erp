@@ -44,9 +44,76 @@ CREATE TABLE parts (
   name TEXT NOT NULL,
   brand TEXT,
   category TEXT,
-  price NUMERIC(10,2) NOT NULL,
-  cost NUMERIC(10,2) NOT NULL DEFAULT 0,
-  UNIQUE(organization_id, part_number)
+  barcode TEXT,
+  manufacturer TEXT,
+  oem_numbers TEXT[] NOT NULL DEFAULT '{}',
+  cross_reference_numbers TEXT[] NOT NULL DEFAULT '{}',
+  unit TEXT NOT NULL DEFAULT 'piece',
+  quality_grade TEXT,
+  country_of_origin TEXT,
+  warranty_months INTEGER NOT NULL DEFAULT 0 CHECK (warranty_months >= 0),
+  catalog_status TEXT NOT NULL DEFAULT 'active' CHECK (catalog_status IN ('draft','active','archived')),
+  catalog_source TEXT,
+  catalog_key TEXT,
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  cost NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (cost >= 0),
+  UNIQUE(organization_id, part_number),
+  UNIQUE(organization_id, catalog_source, catalog_key)
+);
+
+CREATE TABLE suppliers (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  vat_number TEXT,
+  phone TEXT,
+  email TEXT,
+  payment_terms_days INTEGER NOT NULL DEFAULT 0 CHECK (payment_terms_days >= 0),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
+  UNIQUE(organization_id, name)
+);
+
+CREATE TABLE part_suppliers (
+  part_id INTEGER NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+  supplier_part_number TEXT,
+  purchase_price NUMERIC(10,2) CHECK (purchase_price >= 0),
+  lead_time_days INTEGER CHECK (lead_time_days >= 0),
+  is_preferred BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (part_id, supplier_id)
+);
+
+CREATE TABLE vehicle_applications (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  part_id INTEGER NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+  make TEXT NOT NULL,
+  model TEXT NOT NULL,
+  year_from INTEGER,
+  year_to INTEGER,
+  engine TEXT,
+  trim TEXT,
+  market TEXT NOT NULL DEFAULT 'SA',
+  source TEXT,
+  source_vehicle_id TEXT,
+  verification_status TEXT NOT NULL DEFAULT 'unverified'
+    CHECK (verification_status IN ('unverified','verified','rejected')),
+  CHECK (year_from IS NULL OR year_from BETWEEN 1900 AND 2200),
+  CHECK (year_to IS NULL OR year_to BETWEEN 1900 AND 2200),
+  CHECK (year_from IS NULL OR year_to IS NULL OR year_from <= year_to)
+);
+
+CREATE TABLE catalog_import_runs (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  requested_by INTEGER NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
+  inserted_count INTEGER NOT NULL DEFAULT 0,
+  skipped_count INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT now(),
+  completed_at TIMESTAMP
 );
 
 -- inventory: quantity of a part at a specific branch + shelf location
@@ -57,8 +124,8 @@ CREATE TABLE inventory (
   shelf_section TEXT,           -- e.g. 'A'
   shelf_number TEXT,            -- e.g. '5'
   shelf_level TEXT,             -- e.g. 'الدور 2'
-  quantity INTEGER NOT NULL DEFAULT 0,
-  min_quantity INTEGER NOT NULL DEFAULT 5,
+  quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  min_quantity INTEGER NOT NULL DEFAULT 5 CHECK (min_quantity >= 0),
   UNIQUE(part_id, branch_id)
 );
 
@@ -76,7 +143,7 @@ CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('customer','seller','admin')),
+  role TEXT NOT NULL CHECK (role IN ('customer','seller','warehouse_keeper','admin')),
   branch_id INTEGER REFERENCES branches(id),
   email TEXT NOT NULL,
   password_hash TEXT,
@@ -85,12 +152,84 @@ CREATE TABLE users (
   UNIQUE(organization_id, email)
 );
 
+CREATE TABLE customer_vehicles (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  vin CHAR(17) NOT NULL,
+  nickname TEXT,
+  make TEXT NOT NULL,
+  model TEXT NOT NULL,
+  model_year INTEGER NOT NULL CHECK (model_year BETWEEN 1900 AND 2200),
+  engine TEXT,
+  trim TEXT,
+  plate_number TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP NOT NULL DEFAULT now(),
+  UNIQUE(user_id, vin),
+  CHECK (vin = upper(vin)),
+  CHECK (vin !~ '[IOQ]')
+);
+
+CREATE TABLE organization_invites (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('customer','seller','warehouse_keeper')),
+  branch_id INTEGER REFERENCES branches(id),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE organization_devices (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  branch_id INTEGER NOT NULL REFERENCES branches(id),
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  paired_by INTEGER NOT NULL REFERENCES users(id),
+  paired_at TIMESTAMP NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMP
+);
+
+CREATE TABLE device_pairing_codes (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  branch_id INTEGER NOT NULL REFERENCES branches(id),
+  device_name TEXT NOT NULL,
+  code_hash TEXT NOT NULL UNIQUE,
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE inventory_movements (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  branch_id INTEGER NOT NULL REFERENCES branches(id),
+  part_id INTEGER NOT NULL REFERENCES parts(id),
+  device_id INTEGER REFERENCES organization_devices(id),
+  performed_by INTEGER NOT NULL REFERENCES users(id),
+  movement_type TEXT NOT NULL CHECK (movement_type IN ('sale','warehouse_issue','receipt','adjustment','return')),
+  quantity_change INTEGER NOT NULL CHECK (quantity_change <> 0),
+  reference_type TEXT,
+  reference_id TEXT,
+  note TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
 CREATE TABLE invoices (
   id SERIAL PRIMARY KEY,
   organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   invoice_number TEXT NOT NULL,
   branch_id INTEGER REFERENCES branches(id),
   seller_id INTEGER REFERENCES users(id),
+  customer_id INTEGER REFERENCES users(id),
   subtotal NUMERIC(10,2) NOT NULL,
   vat NUMERIC(10,2) NOT NULL,
   total NUMERIC(10,2) NOT NULL,
@@ -106,13 +245,17 @@ CREATE TABLE invoice_items (
   id SERIAL PRIMARY KEY,
   invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
   part_id INTEGER REFERENCES parts(id),
-  quantity INTEGER NOT NULL,
-  unit_price NUMERIC(10,2) NOT NULL
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0)
 );
 
 CREATE INDEX idx_branches_org ON branches(organization_id);
 CREATE INDEX idx_parts_org ON parts(organization_id);
 CREATE INDEX idx_users_org ON users(organization_id);
+CREATE INDEX idx_customer_vehicles_org_vin ON customer_vehicles(organization_id, vin);
 CREATE INDEX idx_invoices_org ON invoices(organization_id);
+CREATE INDEX idx_invites_org_email ON organization_invites(organization_id, email);
+CREATE INDEX idx_devices_org_branch ON organization_devices(organization_id, branch_id);
+CREATE INDEX idx_inventory_movements_org_created ON inventory_movements(organization_id, created_at DESC);
 CREATE INDEX idx_inventory_part ON inventory(part_id);
 CREATE INDEX idx_vin_map_pattern ON vin_map(vin_pattern);

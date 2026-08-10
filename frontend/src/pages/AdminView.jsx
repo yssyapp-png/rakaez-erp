@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { getAdminStats, getBranchesSummary, getInvoices, getOrganization } from "../api/client.js";
+import {
+  createDevicePairingCode,
+  getAdminStats,
+  getBranchesSummary,
+  getDevices,
+  getInvoices,
+  getInventoryMovements,
+  getOrganization,
+  revokeDevice,
+  previewSaudiStarterCatalog,
+  importSaudiStarterCatalog,
+} from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 function TrialBanner({ org, t }) {
@@ -28,12 +39,16 @@ export default function AdminView() {
   const [branches, setBranches] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [org, setOrg] = useState(null);
+  const [devices, setDevices] = useState([]);
+  const [movements, setMovements] = useState([]);
 
   useEffect(() => {
     getAdminStats().then(setStats);
     getBranchesSummary().then(setBranches);
     getInvoices().then(setInvoices);
     getOrganization().then(setOrg);
+    getDevices().then((data) => setDevices(Array.isArray(data) ? data : []));
+    getInventoryMovements().then((data) => setMovements(Array.isArray(data) ? data : []));
   }, []);
 
   if (!stats) return <p>{t("loading")}</p>;
@@ -41,6 +56,8 @@ export default function AdminView() {
   return (
     <div>
       <TrialBanner org={org} t={t} />
+      <DeviceManagement branches={branches} devices={devices} onDevicesChanged={() => getDevices().then(setDevices)} />
+      <SaudiCatalogImport />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontSize: 12, color: "#777" }}>{t("inventory_value")}</div>
@@ -110,6 +127,84 @@ export default function AdminView() {
         </tbody>
       </table>
       <p style={{ fontSize: 12, color: "#777" }}>{t("zatca_footnote")}</p>
+      <h3>سجل الصرف وحركات المخزون</h3>
+      <table width="100%">
+        <thead><tr><th>الوقت</th><th>الموظف</th><th>الجهاز</th><th>الفرع</th><th>القطعة</th><th>الحركة</th><th>الكمية</th><th>الملاحظة</th></tr></thead>
+        <tbody>
+          {movements.map((movement) => (
+            <tr key={movement.id}>
+              <td>{new Date(movement.created_at).toLocaleString("ar-SA")}</td>
+              <td>{movement.employee_name}</td><td>{movement.device_name || "—"}</td><td>{movement.branch_name}</td>
+              <td>{movement.part_number} — {movement.part_name}</td><td>{movement.movement_type}</td>
+              <td>{movement.quantity_change}</td><td>{movement.note || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  );
+}
+
+function SaudiCatalogImport() {
+  const [preview, setPreview] = useState(null);
+  const [message, setMessage] = useState("");
+  async function loadPreview() { setPreview(await previewSaudiStarterCatalog()); }
+  async function runImport() {
+    const result = await importSaudiStarterCatalog();
+    setMessage(result.error ? `تعذر الاستيراد: ${result.error}` : `أضيف ${result.inserted} قالبًا كمسودة، وتم تجاوز ${result.skipped} مكررًا.`);
+  }
+  return (
+    <section className="rk-card" style={{ marginBottom: 20 }}>
+      <h3>كتالوج السوق السعودي</h3>
+      <p>يضيف قوالب القطع الأكثر تداولًا كمسودات بلا سعر وبلا مخزون. راجع رقم القطعة والتوافق والسعر قبل التفعيل.</p>
+      {!preview ? <button className="rk-btn-outline" onClick={loadPreview}>معاينة الحزمة</button> : (
+        <><p>عدد القوالب: {preview.count}</p><button className="rk-btn" onClick={runImport}>إضافة الحزمة بضغطة واحدة</button></>
+      )}
+      {message && <p>{message}</p>}
+    </section>
+  );
+}
+
+function DeviceManagement({ branches, devices, onDevicesChanged }) {
+  const [branchId, setBranchId] = useState("");
+  const [deviceName, setDeviceName] = useState("");
+  const [pairingCode, setPairingCode] = useState(null);
+  const selectedBranch = branchId || branches[0]?.id || "";
+
+  async function generateCode() {
+    const result = await createDevicePairingCode(selectedBranch, deviceName.trim());
+    if (result.code) setPairingCode(result.code);
+  }
+
+  async function revoke(id) {
+    await revokeDevice(id);
+    onDevicesChanged();
+  }
+
+  return (
+    <section className="rk-card" style={{ marginBottom: 20 }}>
+      <h3>أجهزة الفروع</h3>
+      <p style={{ color: "#666", fontSize: 13 }}>أنشئ رمزًا لمدة 10 دقائق، ثم أدخله في الجهاز المراد ربطه.</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <select className="rk-select" value={selectedBranch} onChange={(e) => setBranchId(e.target.value)}>
+          {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+        </select>
+        <input className="rk-input" value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="اسم الجهاز، مثال: كاشير 1" />
+        <button className="rk-btn" disabled={!selectedBranch || !deviceName.trim()} onClick={generateCode}>إنشاء رمز الربط</button>
+      </div>
+      {pairingCode && <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 6, marginTop: 12 }}>{pairingCode}</div>}
+      <table width="100%" style={{ marginTop: 16 }}>
+        <thead><tr><th>الجهاز</th><th>الفرع</th><th>الحالة</th><th>آخر اتصال</th><th /></tr></thead>
+        <tbody>
+          {devices.map((device) => (
+            <tr key={device.id}>
+              <td>{device.name}</td><td>{device.branch_name}</td><td>{device.status}</td>
+              <td>{device.last_seen_at ? new Date(device.last_seen_at).toLocaleString("ar-SA") : "—"}</td>
+              <td>{device.status === "active" && <button className="rk-btn-outline" onClick={() => revoke(device.id)}>إلغاء الربط</button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

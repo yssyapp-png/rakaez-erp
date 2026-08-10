@@ -16,6 +16,7 @@ const STRINGS = {
     tab_customer: "📱 تطبيق العميل",
     tab_seller: "🧰 البائع / نقاط البيع",
     tab_parts: "📦 قطع الغيار والمخزون",
+    tab_warehouse: "🏭 المستودع",
     tab_admin: "📊 لوحة تحكم الإدارة",
     tab_billing: "💳 الاشتراك والفوترة",
     lang_toggle: "English",
@@ -59,7 +60,7 @@ const STRINGS = {
     sar: "ر.س",
 
     // SellerView
-    seller_search_placeholder: "ابحث عن قطعة، رقم قطعة، أو VIN",
+    seller_search_placeholder: "ابحث عن قطعة، رقم قطعة، أو رقم الهيكل",
     col_part: "القطعة",
     col_price: "السعر",
     col_location: "الموقع",
@@ -147,6 +148,7 @@ const STRINGS = {
     tab_customer: "📱 Customer app",
     tab_seller: "🧰 Seller / POS",
     tab_parts: "📦 Parts & Inventory",
+    tab_warehouse: "🏭 Warehouse",
     tab_admin: "📊 Admin dashboard",
     tab_billing: "💳 Subscription & Billing",
     lang_toggle: "العربية",

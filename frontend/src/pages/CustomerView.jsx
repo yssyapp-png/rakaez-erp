@@ -4,6 +4,7 @@ import MoyasarCheckout from "../components/MoyasarCheckout.jsx";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 export default function CustomerView({ user }) {
+  const paymentsEnabled = import.meta.env.VITE_PAYMENTS_ENABLED === "true";
   const { t } = useLanguage();
   const [q, setQ] = useState("");
   const [type, setType] = useState("name");
@@ -127,7 +128,11 @@ export default function CustomerView({ user }) {
             </span>
           </div>
 
-          {!paying ? (
+          {!paymentsEnabled ? (
+            <div style={{ padding: 10, marginTop: 10, background: "#fffbeb", borderRadius: 8 }}>
+              الطلب الإلكتروني غير متاح في النسخة التجريبية. يمكنك البحث والتواصل مع المحل.
+            </div>
+          ) : !paying ? (
             <button className="rk-btn" style={{ width: "100%", marginTop: 10 }} onClick={() => setPaying(true)}>
               {t("pay_online")}
             </button>
