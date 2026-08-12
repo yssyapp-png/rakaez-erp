@@ -70,6 +70,11 @@ export function normalizeShelfLookup(value) {
   return normalized && normalized.length <= 100 ? normalized : null;
 }
 
+export function normalizeWarehouseLookup(value) {
+  const normalized = String(value ?? "").trim().replace(/\s+/g, " ");
+  return normalized && normalized.length <= 120 ? normalized : null;
+}
+
 async function branchBelongsToOrganization(client, branchId, organizationId) {
   const result = await client.query(
     "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
@@ -301,6 +306,73 @@ router.get("/shelf-lookup", deviceRequired, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "shelf_lookup_failed" });
+  }
+});
+
+/** Unified warehouse lookup by shelf, part number, barcode, or part name. */
+router.get("/warehouse-lookup", deviceRequired, async (req, res) => {
+  if (!["admin", "seller", "warehouse_keeper"].includes(req.user.role)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const query = normalizeWarehouseLookup(req.query.q);
+  if (!query) return res.status(400).json({ error: "invalid_lookup_query" });
+  const shelfCode = normalizeShelfLookup(query);
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.part_number, p.name, p.brand, p.barcode,
+              i.quantity, i.min_quantity, i.shelf_section, i.shelf_number, i.shelf_level,
+              CASE
+                WHEN p.barcode = $3 THEN 'barcode'
+                WHEN upper(p.part_number) = upper($3) THEN 'part_number'
+                WHEN upper(regexp_replace(coalesce(i.shelf_number,''), '\\s+', '', 'g')) = $4
+                  OR upper(regexp_replace(concat_ws('-', i.shelf_section, i.shelf_number), '\\s+', '', 'g')) = $4
+                  THEN 'shelf'
+                ELSE 'text'
+              END AS match_type
+       FROM inventory i
+       JOIN parts p ON p.id = i.part_id
+       WHERE p.organization_id = $1 AND i.branch_id = $2
+         AND (
+           p.barcode = $3
+           OR p.part_number ILIKE '%' || $3 || '%'
+           OR p.name ILIKE '%' || $3 || '%'
+           OR upper(regexp_replace(coalesce(i.shelf_number,''), '\\s+', '', 'g')) = $4
+           OR upper(regexp_replace(concat_ws('-', i.shelf_section, i.shelf_number), '\\s+', '', 'g')) = $4
+         )
+       ORDER BY
+         CASE WHEN p.barcode = $3 OR upper(p.part_number) = upper($3) THEN 0 ELSE 1 END,
+         p.name
+       LIMIT 50`,
+      [req.user.organizationId, req.device.branch_id, query, shelfCode]
+    );
+    res.json({ query, branchId: req.device.branch_id, count: result.rows.length, parts: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "warehouse_lookup_failed" });
+  }
+});
+
+/** Low-stock dashboard for the paired device's branch. */
+router.get("/warehouse-low-stock", deviceRequired, async (req, res) => {
+  if (!["admin", "seller", "warehouse_keeper"].includes(req.user.role)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.part_number, p.name, p.brand, p.barcode,
+              i.quantity, i.min_quantity, i.shelf_section, i.shelf_number, i.shelf_level
+       FROM inventory i
+       JOIN parts p ON p.id = i.part_id
+       WHERE p.organization_id = $1 AND i.branch_id = $2
+         AND i.quantity <= i.min_quantity
+       ORDER BY (i.min_quantity - i.quantity) DESC, p.name
+       LIMIT 100`,
+      [req.user.organizationId, req.device.branch_id]
+    );
+    res.json({ branchId: req.device.branch_id, count: result.rows.length, parts: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "low_stock_lookup_failed" });
   }
 });
 

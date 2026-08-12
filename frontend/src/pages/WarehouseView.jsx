@@ -1,5 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { findPartsByShelf, getAllParts, issueInventory, isDevicePaired, pairDevice } from "../api/client.js";
+import {
+  findWarehouseParts,
+  getAllParts,
+  getWarehouseLowStock,
+  issueInventory,
+  isDevicePaired,
+  pairDevice,
+} from "../api/client.js";
+
+const MATCH_TYPE_LABELS = {
+  barcode: "تطابق الباركود",
+  part_number: "تطابق رقم القطعة",
+  shelf: "تطابق رقم الرف",
+  text: "تطابق الاسم أو الوصف",
+};
 
 export default function WarehouseView({ user }) {
   const [parts, setParts] = useState([]);
@@ -12,6 +26,7 @@ export default function WarehouseView({ user }) {
   const [shelfCode, setShelfCode] = useState("");
   const [shelfResult, setShelfResult] = useState(null);
   const [lookingUp, setLookingUp] = useState(false);
+  const [showingLowStock, setShowingLowStock] = useState(false);
 
   useEffect(() => {
     if (paired) getAllParts().then((data) => setParts(Array.isArray(data) ? data : []));
@@ -26,20 +41,58 @@ export default function WarehouseView({ user }) {
   async function issue() {
     const result = await issueInventory(partId, Number(quantity), note.trim());
     setMessage(result.error ? `تعذر الصرف: ${result.error}` : `تم الصرف باسم ${user?.name}. المتبقي: ${result.remainingQuantity}`);
-    if (!result.error) { setQuantity(1); setNote(""); }
+    if (!result.error) {
+      setQuantity(1);
+      setNote("");
+      setShelfResult((current) => current ? {
+        ...current,
+        parts: current.parts.map((part) => String(part.id) === String(partId)
+          ? { ...part, quantity: result.remainingQuantity }
+          : part),
+      } : current);
+    }
   }
 
   async function lookupShelf() {
     setLookingUp(true);
-    const result = await findPartsByShelf(shelfCode.trim());
-    setLookingUp(false);
-    if (result.error) {
-      setMessage(`تعذر البحث: ${result.error}`);
+    setShowingLowStock(false);
+    try {
+      const result = await findWarehouseParts(shelfCode.trim());
+      if (result.error) {
+        setMessage(`تعذر البحث: ${result.error}`);
+        setShelfResult(null);
+        return;
+      }
+      setMessage(result.count ? `تم العثور على ${result.count} نتيجة` : "لا توجد قطعة مطابقة في هذا الفرع");
+      setShelfResult(result);
+    } catch {
+      setMessage("تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.");
       setShelfResult(null);
-      return;
+    } finally {
+      setLookingUp(false);
     }
-    setMessage(result.count ? `تم العثور على ${result.count} قطعة في الرف` : "لا توجد قطع مسجلة على هذا الرف");
-    setShelfResult(result);
+  }
+
+  async function loadLowStock() {
+    setLookingUp(true);
+    try {
+      const result = await getWarehouseLowStock();
+      if (result.error) {
+        setMessage(`تعذر عرض النواقص: ${result.error}`);
+        setShelfResult(null);
+        setShowingLowStock(false);
+        return;
+      }
+      setShelfResult(result);
+      setShowingLowStock(true);
+      setMessage(result.count ? `${result.count} قطعة بلغت حد إعادة الطلب` : "لا توجد نواقص في هذا الفرع");
+    } catch {
+      setMessage("تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.");
+      setShelfResult(null);
+      setShowingLowStock(false);
+    } finally {
+      setLookingUp(false);
+    }
   }
 
   if (!paired) {
@@ -49,25 +102,40 @@ export default function WarehouseView({ user }) {
   return (
     <div>
     <div className="rk-card" style={{ marginBottom: 16 }}>
-      <h3>العثور على القطعة برقم الرف</h3>
-      <p>اكتب الرقم الموجود على الرف، مثل <b>A-15</b> أو <b>15</b>.</p>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input className="rk-input" value={shelfCode} onChange={(e) => { setShelfCode(e.target.value); setShelfResult(null); }} placeholder="رقم الرف" />
+      <h3>البحث الذكي في مخزون الفرع</h3>
+      <p>ابحث برقم الرف أو رقم القطعة أو الباركود أو اسم القطعة.</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input
+          className="rk-input"
+          value={shelfCode}
+          onChange={(e) => { setShelfCode(e.target.value); setShelfResult(null); setShowingLowStock(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && shelfCode.trim() && !lookingUp) lookupShelf(); }}
+          placeholder="A-15 أو الباركود أو رقم القطعة"
+        />
         <button className="rk-btn" disabled={!shelfCode.trim() || lookingUp} onClick={lookupShelf}>
           {lookingUp ? "جاري البحث..." : "بحث"}
         </button>
+        <button className="rk-btn-outline" disabled={lookingUp} onClick={loadLowStock}>ناقص المخزون</button>
       </div>
+      {showingLowStock && <h4 style={{ marginTop: 14 }}>تنبيهات إعادة الطلب</h4>}
       {shelfResult?.parts?.map((part) => (
         <button
           key={part.id}
           type="button"
           className="rk-card"
           onClick={() => setPartId(String(part.id))}
-          style={{ width: "100%", textAlign: "right", marginTop: 8, cursor: "pointer" }}
+          style={{
+            width: "100%", textAlign: "right", marginTop: 8, cursor: "pointer",
+            borderColor: String(part.id) === String(partId) ? "var(--rakaez-gold)" : undefined,
+          }}
         >
           <b>{part.part_number} — {part.name}</b>
           <div>الكمية: {part.quantity} | الموقع: {[part.shelf_section, part.shelf_number, part.shelf_level].filter(Boolean).join(" / ")}</div>
           {part.barcode && <div>الباركود: {part.barcode}</div>}
+          {showingLowStock && <div style={{ color: "#b91c1c" }}>الحد الأدنى: {part.min_quantity}</div>}
+          {!showingLowStock && part.match_type && (
+            <div style={{ fontSize: 12 }}>{MATCH_TYPE_LABELS[part.match_type] || "نتيجة مطابقة"}</div>
+          )}
         </button>
       ))}
     </div>

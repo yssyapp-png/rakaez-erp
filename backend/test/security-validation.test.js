@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isNonNegativeInteger, isNonNegativeMoney, normalizeShelfLookup, validateImportRows } from "../src/routes/parts.js";
+import { isNonNegativeInteger, isNonNegativeMoney, normalizeShelfLookup, normalizeWarehouseLookup, validateImportRows } from "../src/routes/parts.js";
 import { hasValidItems } from "../src/routes/sales.js";
 import { subscriptionAllowsAccess } from "../src/routes/auth.js";
 import { SAUDI_STARTER_CATALOG } from "../src/routes/catalog.js";
@@ -113,4 +113,19 @@ test("shelf lookup is scoped to the paired device branch and tenant", async () =
   assert.match(source, /i\.branch_id = \$2/);
   assert.match(source, /p\.organization_id = \$1/);
   assert.match(source, /router\.get\("\/shelf-lookup", deviceRequired/);
+});
+
+test("warehouse lookup accepts useful terms and bounds query size", () => {
+  assert.equal(normalizeWarehouseLookup("  04465  0W141 "), "04465 0W141");
+  assert.equal(normalizeWarehouseLookup(""), null);
+  assert.equal(normalizeWarehouseLookup("X".repeat(121)), null);
+});
+
+test("warehouse lookup and low stock are device, branch, and tenant scoped", async () => {
+  const source = await fs.readFile(new URL("../src/routes/parts.js", import.meta.url), "utf8");
+  assert.match(source, /router\.get\("\/warehouse-lookup", deviceRequired/);
+  assert.match(source, /router\.get\("\/warehouse-low-stock", deviceRequired/);
+  assert.match(source, /i\.quantity <= i\.min_quantity/);
+  assert.match(source, /LIMIT 50/);
+  assert.match(source, /LIMIT 100/);
 });

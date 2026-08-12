@@ -160,6 +160,18 @@ export async function findPartsByShelf(code) {
   return res.json();
 }
 
+export async function findWarehouseParts(query) {
+  const res = await fetch(`${BASE}/parts/warehouse-lookup?q=${encodeURIComponent(query)}`, {
+    headers: authHeaders(),
+  });
+  return res.json();
+}
+
+export async function getWarehouseLowStock() {
+  const res = await fetch(`${BASE}/parts/warehouse-low-stock`, { headers: authHeaders() });
+  return res.json();
+}
+
 export async function getInvoices() {
   const res = await fetch(`${BASE}/sales/invoices`, { headers: authHeaders() });
   return res.json();
