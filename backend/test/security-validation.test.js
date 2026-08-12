@@ -298,6 +298,21 @@ test("production web delivery is restricted to compiled assets with CSP and requ
   assert.match(index, /Retry-After/);
   assert.match(index, /dotfiles: "deny"/);
   assert.match(index, /sendFile\(path\.join\(publicDirectory, "index\.html"\)/);
-  assert.match(docker, /FROM node:22-alpine AS web-dependencies/);
+  assert.match(docker, /FROM node:24-alpine AS web-dependencies/);
   assert.match(docker, /COPY --from=web-build \/web\/dist \.\/public/);
+});
+
+test("local, CI, and container runtimes are pinned to Node.js 24", async () => {
+  const backendPackage = JSON.parse(await fs.readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const frontendPackage = JSON.parse(await fs.readFile(new URL("../../frontend/package.json", import.meta.url), "utf8"));
+  const workflow = await fs.readFile(new URL("../../.github/workflows/ci-cd.yml", import.meta.url), "utf8");
+  const docker = await fs.readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+  const nodeVersion = (await fs.readFile(new URL("../../.node-version", import.meta.url), "utf8")).trim();
+
+  assert.equal(backendPackage.engines.node, ">=24 <25");
+  assert.equal(frontendPackage.engines.node, ">=24 <25");
+  assert.equal(nodeVersion, "24");
+  assert.match(workflow, /node-version: \[24\.x\]/);
+  assert.doesNotMatch(workflow, /node-version: \[(?:20|22)\.x\]/);
+  assert.equal((docker.match(/FROM node:24-alpine/g) || []).length, 3);
 });

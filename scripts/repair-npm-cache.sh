@@ -9,8 +9,8 @@ repository_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cache_root="${TMPDIR:-/tmp}/rakaez-npm-cache"
 
 node_major=$(node -p "Number(process.versions.node.split('.')[0])")
-if [ "$node_major" -lt 20 ] || [ "$node_major" -gt 22 ]; then
-  echo "Rakaez requires Node.js 20 or 22. Current version: $(node --version)" >&2
+if [ "$node_major" -ne 24 ]; then
+  echo "Rakaez requires Node.js 24. Current version: $(node --version)" >&2
   exit 1
 fi
 

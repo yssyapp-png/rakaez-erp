@@ -5,8 +5,8 @@
   "private": true,
   "packageManager": "npm@10.9.2",
   "engines": {
-    "node": ">=20.19 <23",
-    "npm": ">=10 <11"
+    "node": ">=24 <25",
+    "npm": ">=10 <12"
   },
   "scripts": {
     "dev": "node --watch src/index.js",

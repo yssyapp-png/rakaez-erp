@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         # اختبر فقط على إصدارات Node المدعومة المستخدمة في الإنتاج.
-        node-version: [20.x, 22.x]
+        node-version: [24.x]
         # المشروع مقسوم لمجلدين منفصلين، كل واحد فيه package.json خاص به —
         # لا يوجد package.json بجذر المستودع. هذا هو سبب فشل ٣ من ٨ فحوصات
         # سابقاً: الخطوات كانت تشتغل بالجذر مباشرة بدون تحديد working-directory
@@ -72,7 +72,7 @@ jobs:
     - name: Use Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: 20.x
+        node-version: 24.x
         cache: 'npm'
         cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
