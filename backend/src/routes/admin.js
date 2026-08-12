@@ -1,15 +1,40 @@
-import { Router } from "express";
 import crypto from "crypto";
 import { pool } from "../db/pool.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
+
+router.post("/branches", async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  const city = String(req.body?.city || "").trim();
+  if (!name || name.length > 120 || city.length > 120) {
+    return res.status(400).json({ error: "invalid_branch_details" });
+  }
+  try {
+    const existing = await pool.query(
+      "SELECT id FROM branches WHERE organization_id = $1 AND lower(name) = lower($2)",
+      [req.user.organizationId, name]
+    );
+    if (existing.rows[0]) return res.status(409).json({ error: "branch_name_exists" });
+    const result = await pool.query(
+      `INSERT INTO branches (organization_id, name, city)
+       VALUES ($1,$2,$3) RETURNING id, name, city`,
+      [req.user.organizationId, name, city || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "branch_create_failed" });
+  }
+});
 
 router.post("/invitations", async (req, res) => {
   const orgId = req.user.organizationId;
-  const email = String(req.body.email || "").trim().toLowerCase();
-  const role = req.body.role;
-  const branchId = req.body.branchId || null;
-  if (!email || !email.includes("@") || !["customer", "seller", "warehouse_keeper"].includes(role)) {
+  const body = req.body || {};
+  const email = String(body.email || "").trim().toLowerCase();
+  const role = body.role;
+  const branchId = body.branchId || null;
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["customer", "seller", "warehouse_keeper"].includes(role)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   if (["seller", "warehouse_keeper"].includes(role) && !branchId) {
@@ -81,7 +106,7 @@ router.get("/stats", async (req, res) => {
 router.get("/branches-summary", async (req, res) => {
   const orgId = req.user.organizationId;
   const r = await pool.query(
-    `SELECT b.id, b.name,
+    `SELECT b.id, b.name, b.city,
        COUNT(i.id) AS part_count,
        COALESCE(SUM(i.quantity * p.cost),0) AS inventory_value,
        COUNT(*) FILTER (WHERE i.quantity < i.min_quantity) AS low_stock_count
@@ -89,7 +114,7 @@ router.get("/branches-summary", async (req, res) => {
      LEFT JOIN inventory i ON i.branch_id = b.id
      LEFT JOIN parts p ON p.id = i.part_id
      WHERE b.organization_id = $1
-     GROUP BY b.id, b.name
+     GROUP BY b.id, b.name, b.city
      ORDER BY b.id`,
     [orgId]
   );
@@ -123,6 +148,21 @@ router.get("/organization", async (req, res) => {
     [req.user.organizationId]
   );
   res.json(r.rows[0] || null);
+});
+
+router.put("/organization", async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  const vatNumber = String(req.body?.vatNumber || "").replace(/\s/g, "");
+  if (!name || name.length > 200 || !/^\d{15}$/.test(vatNumber)) {
+    return res.status(400).json({ error: "invalid_organization_details" });
+  }
+  const result = await pool.query(
+    `UPDATE organizations SET name = $1, vat_number = $2
+     WHERE id = $3 RETURNING id, name, vat_number, login_code`,
+    [name, vatNumber, req.user.organizationId]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: "organization_not_found" });
+  res.json(result.rows[0]);
 });
 
 export default router;

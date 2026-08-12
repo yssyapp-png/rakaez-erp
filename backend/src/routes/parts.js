@@ -1,10 +1,10 @@
-import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { deviceRequired } from "./devices.js";
 import { normalizeVin } from "./vehicles.js";
 import { requireRole } from "./auth.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
 
 export function isNonNegativeMoney(value) {
   return Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -41,7 +41,7 @@ export function validateImportRows(rows, mode = "skip") {
     const rowErrors = [];
     if (!partNumber) rowErrors.push("part_number_required");
     if (!name) rowErrors.push("name_required");
-    if (!isNonNegativeMoney(price)) rowErrors.push("invalid_price");
+    if (!isNonNegativeMoney(price) || price <= 0) rowErrors.push("invalid_price");
     if (!isNonNegativeMoney(cost)) rowErrors.push("invalid_cost");
     if (!isNonNegativeInteger(quantity)) rowErrors.push("invalid_quantity");
     if (!isNonNegativeInteger(minQuantity)) rowErrors.push("invalid_min_quantity");
@@ -83,6 +83,13 @@ async function branchBelongsToOrganization(client, branchId, organizationId) {
   return Boolean(result.rows[0]);
 }
 
+const CUSTOMER_PART_COLUMNS = `p.id, p.part_number, p.name, p.brand, p.category,
+  p.barcode, p.manufacturer, p.oem_numbers, p.cross_reference_numbers, p.unit,
+  p.quality_grade, p.country_of_origin, p.warranty_months, p.price`;
+
+const STAFF_PART_COLUMNS = `${CUSTOMER_PART_COLUMNS}, p.cost, p.catalog_status,
+  p.catalog_source, p.catalog_key`;
+
 /**
  * GET /api/parts/search?q=...&type=name|pn|vin
  * Unified search used by the customer app and the seller/POS screen.
@@ -93,17 +100,24 @@ async function branchBelongsToOrganization(client, branchId, organizationId) {
  */
 router.get("/search", async (req, res) => {
   const { q = "", type = "name" } = req.query;
+  const searchTerm = String(q).trim();
+  if (!searchTerm) return res.status(400).json({ error: "search_required" });
+  if (searchTerm.length > 120) return res.status(400).json({ error: "search_too_long" });
   const orgId = req.user.organizationId;
+  const isCustomer = req.user.role === "customer";
+  const partColumns = req.user.role === "admin" ? STAFF_PART_COLUMNS : CUSTOMER_PART_COLUMNS;
   try {
     let rows;
     if (type === "pn") {
       const r = await pool.query(
-        `SELECT * FROM parts WHERE organization_id = $1 AND catalog_status = 'active' AND part_number ILIKE $2`,
-        [orgId, `%${q}%`]
+        `SELECT ${partColumns} FROM parts p
+         WHERE p.organization_id = $1 AND p.catalog_status = 'active' AND p.part_number ILIKE $2
+         ORDER BY p.name LIMIT 100`,
+        [orgId, `%${searchTerm}%`]
       );
       rows = r.rows;
     } else if (type === "vin") {
-      const vin = normalizeVin(q);
+      const vin = normalizeVin(searchTerm);
       if (!vin) return res.status(400).json({ error: "invalid_vin" });
       const ownerFilter = req.user.role === "customer" ? "AND cv.user_id = $3" : "";
       const params = req.user.role === "customer" ? [orgId, vin, req.user.id] : [orgId, vin];
@@ -113,7 +127,7 @@ router.get("/search", async (req, res) => {
       );
       if (!savedVehicle.rows[0]) return res.status(404).json({ error: "vehicle_not_saved" });
       const r = await pool.query(
-        `SELECT DISTINCT p.* FROM customer_vehicles cv
+        `SELECT DISTINCT ${partColumns} FROM customer_vehicles cv
          JOIN vehicle_applications va
            ON va.organization_id = cv.organization_id
           AND lower(va.make) = lower(cv.make)
@@ -130,9 +144,13 @@ router.get("/search", async (req, res) => {
       rows = r.rows;
     } else {
       const r = await pool.query(
-        `SELECT * FROM parts
-         WHERE organization_id = $1 AND catalog_status = 'active' AND (name ILIKE $2 OR brand ILIKE $2 OR category ILIKE $2)`,
-        [orgId, `%${q}%`]
+        `SELECT ${partColumns} FROM parts p
+         WHERE p.organization_id = $1 AND p.catalog_status = 'active'
+           AND (p.name ILIKE $2 OR p.brand ILIKE $2 OR p.category ILIKE $2
+             OR p.part_number ILIKE $2 OR p.barcode ILIKE $2
+             OR EXISTS (SELECT 1 FROM unnest(p.oem_numbers || p.cross_reference_numbers) n WHERE n ILIKE $2))
+         ORDER BY p.name LIMIT 100`,
+        [orgId, `%${searchTerm}%`]
       );
       rows = r.rows;
     }
@@ -140,15 +158,31 @@ router.get("/search", async (req, res) => {
     // attach inventory + shelf location per branch for each part found
     const withInventory = await Promise.all(
       rows.map(async (part) => {
+        const inventoryColumns = isCustomer
+          ? "i.id, i.branch_id, b.name AS branch_name, i.quantity"
+          : "i.id, i.branch_id, b.name AS branch_name, i.quantity, i.min_quantity, i.shelf_section, i.shelf_number, i.shelf_level";
+        const isBranchEmployee = ["seller", "warehouse_keeper"].includes(req.user.role);
+        const branchFilter = isBranchEmployee ? "AND i.branch_id = $3" : "";
+        const inventoryParams = isBranchEmployee
+          ? [part.id, orgId, req.user.branchId]
+          : [part.id, orgId];
         const inv = await pool.query(
-          `SELECT i.*, b.name AS branch_name
+          `SELECT ${inventoryColumns}
            FROM inventory i JOIN branches b ON b.id = i.branch_id
-           WHERE i.part_id = $1 AND b.organization_id = $2`,
-          [part.id, orgId]
+           WHERE i.part_id = $1 AND b.organization_id = $2 ${branchFilter}`,
+          inventoryParams
         );
+        const visibleInventory = isCustomer
+          ? inv.rows.filter((row) => Number(row.quantity) > 0).map((row) => ({
+              id: row.id,
+              branch_id: row.branch_id,
+              branch_name: row.branch_name,
+              available: true,
+            }))
+          : inv.rows;
         // the app-facing "id" stays the shop-friendly part_number (e.g. P-1001);
         // the numeric primary key is an internal detail callers don't need
-        return { ...part, id: part.part_number, inventory: inv.rows };
+        return { ...part, id: part.part_number, inventory: visibleInventory };
       })
     );
 
@@ -159,11 +193,37 @@ router.get("/search", async (req, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
-  const r = await pool.query("SELECT * FROM parts WHERE organization_id = $1 ORDER BY name", [
+router.get("/", requireRole("admin", "warehouse_keeper"), async (req, res) => {
+  const columns = req.user.role === "warehouse_keeper" ? CUSTOMER_PART_COLUMNS : STAFF_PART_COLUMNS;
+  const statusFilter = req.user.role === "warehouse_keeper"
+    ? "AND p.catalog_status = 'active'"
+    : "AND p.catalog_status <> 'archived'";
+  if (req.user.role === "warehouse_keeper" && !req.user.branchId) {
+    return res.status(403).json({ error: "employee_branch_required" });
+  }
+  const r = await pool.query(`SELECT ${columns} FROM parts p WHERE p.organization_id = $1 ${statusFilter} ORDER BY p.name`, [
     req.user.organizationId,
   ]);
-  res.json(r.rows);
+  const employeeBranchFilter = req.user.role === "warehouse_keeper" ? "AND i.branch_id = $2" : "";
+  const inventoryParams = req.user.role === "warehouse_keeper"
+    ? [req.user.organizationId, req.user.branchId]
+    : [req.user.organizationId];
+  const inventory = await pool.query(
+    `SELECT i.part_id, i.branch_id, i.quantity, i.min_quantity,
+            i.shelf_section, i.shelf_number, i.shelf_level
+     FROM inventory i
+     JOIN parts p ON p.id = i.part_id
+     JOIN branches b ON b.id = i.branch_id
+     WHERE p.organization_id = $1 AND b.organization_id = $1 ${employeeBranchFilter}`,
+    inventoryParams
+  );
+  const byPart = new Map();
+  for (const row of inventory.rows) {
+    if (!byPart.has(row.part_id)) byPart.set(row.part_id, []);
+    byPart.get(row.part_id).push(row);
+  }
+  const visibleParts = r.rows.filter((part) => req.user.role !== "warehouse_keeper" || byPart.has(part.id));
+  res.json(visibleParts.map((part) => ({ ...part, inventory: byPart.get(part.id) || [] })));
 });
 
 router.post("/import/preview", requireRole("admin"), async (req, res) => {
@@ -379,18 +439,16 @@ router.get("/warehouse-low-stock", deviceRequired, async (req, res) => {
 /**
  * POST /api/parts
  * Lets a shop owner add a new part to THEIR OWN catalog from the dashboard —
- * no developer involvement needed. Restricted to seller/admin (checked in
- * index.js's requireRole for /api/admin, but parts is mounted for both
- * seller and admin so we check the role inline here instead).
+ * no developer involvement needed. Catalog and direct stock mutations are
+ * restricted to administrators; sellers only sell through paired POS flows.
  */
-router.post("/", async (req, res) => {
-  if (!["admin", "seller"].includes(req.user.role)) return res.status(403).json({ error: "forbidden" });
+router.post("/", requireRole("admin"), async (req, res) => {
   const orgId = req.user.organizationId;
   const { partNumber, name, brand, category, price, cost, branchId, quantity, minQuantity } = req.body;
   if (!partNumber || !name || price == null) {
     return res.status(400).json({ error: "missing_fields" });
   }
-  if (!isNonNegativeMoney(price) || !isNonNegativeMoney(cost ?? 0)) {
+  if (!isNonNegativeMoney(price) || Number(price) <= 0 || !isNonNegativeMoney(cost ?? 0)) {
     return res.status(400).json({ error: "invalid_price" });
   }
   if (!isNonNegativeInteger(quantity ?? 0) || !isNonNegativeInteger(minQuantity ?? 5)) {
@@ -415,8 +473,16 @@ router.post("/", async (req, res) => {
         `INSERT INTO inventory (part_id, branch_id, quantity, min_quantity)
          VALUES ($1,$2,$3,$4)
          ON CONFLICT (part_id, branch_id) DO UPDATE SET quantity = EXCLUDED.quantity`,
-        [part.id, branchId, quantity || 0, minQuantity || 5]
+        [part.id, branchId, quantity ?? 0, minQuantity ?? 5]
       );
+      if (Number(quantity || 0) > 0) {
+        await client.query(
+          `INSERT INTO inventory_movements
+           (organization_id, branch_id, part_id, performed_by, movement_type, quantity_change, reference_type, reference_id, note)
+           VALUES ($1,$2,$3,$4,'receipt',$5,'part_creation',$6,'رصيد افتتاحي عند إنشاء القطعة')`,
+          [orgId, branchId, part.id, req.user.id, Number(quantity), String(part.id)]
+        );
+      }
     }
     await client.query("COMMIT");
     res.status(201).json(part);
@@ -434,8 +500,7 @@ router.post("/", async (req, res) => {
  * PUT /api/parts/:id  — edit price/cost/name/brand/category of an existing part.
  * :id here is the numeric primary key (not the shop-facing part_number).
  */
-router.put("/:id", async (req, res) => {
-  if (!["admin", "seller"].includes(req.user.role)) return res.status(403).json({ error: "forbidden" });
+router.put("/:id", requireRole("admin"), async (req, res) => {
   const { name, brand, category, price, cost, barcode, manufacturer, catalogStatus } = req.body;
   if ((price != null && !isNonNegativeMoney(price)) || (cost != null && !isNonNegativeMoney(cost))) {
     return res.status(400).json({ error: "invalid_price" });
@@ -470,15 +535,14 @@ router.put("/:id", async (req, res) => {
   res.json(r.rows[0]);
 });
 
-/** DELETE /api/parts/:id */
-router.delete("/:id", async (req, res) => {
-  if (!["admin", "seller"].includes(req.user.role)) return res.status(403).json({ error: "forbidden" });
+/** DELETE /api/parts/:id — archives instead of destroying invoice history. */
+router.delete("/:id", requireRole("admin"), async (req, res) => {
   const r = await pool.query(
-    "DELETE FROM parts WHERE id = $1 AND organization_id = $2 RETURNING id",
+    "UPDATE parts SET catalog_status = 'archived' WHERE id = $1 AND organization_id = $2 RETURNING id",
     [req.params.id, req.user.organizationId]
   );
   if (!r.rows[0]) return res.status(404).json({ error: "not_found" });
-  res.json({ ok: true });
+  res.json({ ok: true, archived: true });
 });
 
 /**
@@ -486,37 +550,65 @@ router.delete("/:id", async (req, res) => {
  * Used by the "monitor inventory" screen; upserts so the owner can set stock
  * for a branch that has no inventory row yet.
  */
-router.put("/:id/inventory", async (req, res) => {
-  if (!["admin", "seller"].includes(req.user.role)) return res.status(403).json({ error: "forbidden" });
+router.put("/:id/inventory", requireRole("admin"), async (req, res) => {
   const { branchId, quantity, minQuantity, shelfSection, shelfNumber, shelfLevel } = req.body;
   if (!branchId) return res.status(400).json({ error: "missing_branchId" });
-  if (!isNonNegativeInteger(quantity ?? 0) || !isNonNegativeInteger(minQuantity ?? 5)) {
+  if (!isNonNegativeInteger(quantity ?? 0) || (minQuantity != null && !isNonNegativeInteger(minQuantity))) {
     return res.status(400).json({ error: "invalid_quantity" });
   }
 
-  // ownership check: the branch must belong to this org
-  const owns = await pool.query(
-    `SELECT p.id FROM parts p WHERE p.id = $1 AND p.organization_id = $2`,
-    [req.params.id, req.user.organizationId]
-  );
-  if (!owns.rows[0]) return res.status(404).json({ error: "not_found" });
-
-  const branchOwned = await branchBelongsToOrganization(pool, branchId, req.user.organizationId);
-  if (!branchOwned) return res.status(404).json({ error: "branch_not_found" });
-
-  const r = await pool.query(
-    `INSERT INTO inventory (part_id, branch_id, quantity, min_quantity, shelf_section, shelf_number, shelf_level)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     ON CONFLICT (part_id, branch_id) DO UPDATE SET
-       quantity = EXCLUDED.quantity,
-       min_quantity = COALESCE(EXCLUDED.min_quantity, inventory.min_quantity),
-       shelf_section = COALESCE(EXCLUDED.shelf_section, inventory.shelf_section),
-       shelf_number = COALESCE(EXCLUDED.shelf_number, inventory.shelf_number),
-       shelf_level = COALESCE(EXCLUDED.shelf_level, inventory.shelf_level)
-     RETURNING *`,
-    [req.params.id, branchId, quantity ?? 0, minQuantity ?? 5, shelfSection || null, shelfNumber || null, shelfLevel || null]
-  );
-  res.json(r.rows[0]);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const owns = await client.query(
+      `SELECT p.id FROM parts p WHERE p.id = $1 AND p.organization_id = $2 FOR UPDATE`,
+      [req.params.id, req.user.organizationId]
+    );
+    if (!owns.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found" });
+    }
+    if (!(await branchBelongsToOrganization(client, branchId, req.user.organizationId))) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "branch_not_found" });
+    }
+    const before = await client.query(
+      "SELECT quantity FROM inventory WHERE part_id = $1 AND branch_id = $2 FOR UPDATE",
+      [req.params.id, branchId]
+    );
+    const previousQuantity = Number(before.rows[0]?.quantity || 0);
+    const nextQuantity = Number(quantity ?? 0);
+    const nextMinQuantity = minQuantity == null ? null : Number(minQuantity);
+    const r = await client.query(
+      `INSERT INTO inventory (part_id, branch_id, quantity, min_quantity, shelf_section, shelf_number, shelf_level)
+       VALUES ($1,$2,$3,COALESCE($4,5),$5,$6,$7)
+       ON CONFLICT (part_id, branch_id) DO UPDATE SET
+         quantity = EXCLUDED.quantity,
+         min_quantity = CASE WHEN $4::integer IS NULL THEN inventory.min_quantity ELSE EXCLUDED.min_quantity END,
+         shelf_section = COALESCE(EXCLUDED.shelf_section, inventory.shelf_section),
+         shelf_number = COALESCE(EXCLUDED.shelf_number, inventory.shelf_number),
+         shelf_level = COALESCE(EXCLUDED.shelf_level, inventory.shelf_level)
+       RETURNING *`,
+      [req.params.id, branchId, nextQuantity, nextMinQuantity, shelfSection || null, shelfNumber || null, shelfLevel || null]
+    );
+    const quantityChange = nextQuantity - previousQuantity;
+    if (quantityChange !== 0) {
+      await client.query(
+        `INSERT INTO inventory_movements
+         (organization_id, branch_id, part_id, performed_by, movement_type, quantity_change, reference_type, reference_id, note)
+         VALUES ($1,$2,$3,$4,'adjustment',$5,'manual_inventory_adjustment',$6,'تعديل يدوي بواسطة المدير')`,
+        [req.user.organizationId, branchId, req.params.id, req.user.id, quantityChange, String(req.params.id)]
+      );
+    }
+    await client.query("COMMIT");
+    res.json(r.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: "inventory_update_failed" });
+  } finally {
+    client.release();
+  }
 });
 
 /** Records an auditable warehouse issue; identity comes from JWT + paired device. */

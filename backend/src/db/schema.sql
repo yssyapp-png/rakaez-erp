@@ -253,6 +253,36 @@ CREATE TABLE invoice_items (
   unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0)
 );
 
+CREATE UNIQUE INDEX idx_invoices_payment_reference_unique
+  ON invoices(payment_reference) WHERE payment_reference IS NOT NULL;
+
+CREATE TABLE subscription_payments (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  payment_reference TEXT NOT NULL UNIQUE,
+  purpose TEXT NOT NULL CHECK (purpose IN ('activation','renewal')),
+  amount_halalas INTEGER NOT NULL CHECK (amount_halalas > 0),
+  currency TEXT NOT NULL DEFAULT 'SAR',
+  billing_interval TEXT NOT NULL CHECK (billing_interval IN ('monthly','yearly')),
+  status TEXT NOT NULL CHECK (status IN ('paid','refunded','failed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE billing_renewal_attempts (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  scheduled_for TIMESTAMP NOT NULL,
+  given_id UUID NOT NULL UNIQUE,
+  payment_reference TEXT UNIQUE,
+  amount_halalas INTEGER NOT NULL CHECK (amount_halalas > 0),
+  billing_interval TEXT NOT NULL CHECK (billing_interval IN ('monthly','yearly')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','failed')),
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(organization_id, scheduled_for)
+);
+
 CREATE INDEX idx_branches_org ON branches(organization_id);
 CREATE INDEX idx_parts_org ON parts(organization_id);
 CREATE INDEX idx_users_org ON users(organization_id);
@@ -261,6 +291,8 @@ CREATE INDEX idx_invoices_org ON invoices(organization_id);
 CREATE INDEX idx_invites_org_email ON organization_invites(organization_id, email);
 CREATE INDEX idx_devices_org_branch ON organization_devices(organization_id, branch_id);
 CREATE INDEX idx_inventory_movements_org_created ON inventory_movements(organization_id, created_at DESC);
+CREATE INDEX idx_subscription_payments_org_created ON subscription_payments(organization_id, created_at DESC);
+CREATE INDEX idx_billing_renewal_attempts_status ON billing_renewal_attempts(status, scheduled_for);
 
 -- Supabase exposes the public schema through PostgREST. Rakaez uses only its
 -- server-side API, so browser roles must never access these tables directly.
@@ -272,7 +304,7 @@ DECLARE
     'vehicle_applications', 'catalog_import_runs', 'inventory', 'vin_map',
     'users', 'customer_vehicles', 'organization_invites',
     'organization_devices', 'device_pairing_codes', 'inventory_movements',
-    'invoices', 'invoice_items'
+    'invoices', 'invoice_items', 'subscription_payments', 'billing_renewal_attempts'
   ];
 BEGIN
   FOREACH table_name IN ARRAY protected_tables LOOP

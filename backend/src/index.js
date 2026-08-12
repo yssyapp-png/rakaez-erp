@@ -22,8 +22,8 @@ if (process.env.NODE_ENV === "production") {
   if (!process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ALLOWED_ORIGINS.includes("localhost")) {
     throw new Error("Production CORS_ALLOWED_ORIGINS must contain the deployed web origin");
   }
-  if (process.env.PAYMENTS_ENABLED === "true" && (!process.env.MOYASAR_SECRET_KEY || !process.env.MOYASAR_PUBLISHABLE_KEY)) {
-    throw new Error("Moyasar keys are required when payments are enabled");
+  if (process.env.PAYMENTS_ENABLED === "true" && !process.env.MOYASAR_SECRET_KEY) {
+    throw new Error("MOYASAR_SECRET_KEY is required when payments are enabled");
   }
 }
 const app = express();
@@ -37,7 +37,7 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:51
   .map((origin) => origin.trim())
   .filter(Boolean);
 app.use(cors({ origin: allowedOrigins, credentials: false }));
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 // Request logging — helps diagnose issues once this is deployed and we
 // can't just watch the terminal live.
@@ -76,16 +76,12 @@ app.use("/api/devices", devicesRouter);
 app.use("/api/catalog", authRequired, requireRole("admin"), catalogRouter);
 app.use("/api/vehicles", authRequired, requireActiveSubscription, vehiclesRouter);
 app.use("/api", (_req, res) => res.status(404).json({ error: "api_route_not_found" }));
-
-app.get("/pay", (req, res) => {
-  const publishableKey = process.env.MOYASAR_PUBLISHABLE_KEY || "";
-  const amount = encodeURIComponent(req.query.amount || "0");
-  const description = encodeURIComponent(req.query.description || "طلب ركائز");
-  const saveCard = req.query.save_card === "1" ? "1" : "0";
-  res.redirect(
-    `/pay.html?amount=${amount}&description=${description}&key=${encodeURIComponent(publishableKey)}&save_card=${saveCard}`
-  );
+app.use((err, _req, res, next) => {
+  console.error("Unhandled API error:", err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: "internal_server_error" });
 });
+
 app.use(express.static(path.join(__dirname, "../public")));
 
 const port = process.env.PORT || 4000;

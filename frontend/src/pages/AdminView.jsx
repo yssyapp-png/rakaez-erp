@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import {
   createDevicePairingCode,
+  createBranch,
+  createInvitation,
   getAdminStats,
   getBranchesSummary,
   getDevices,
@@ -10,6 +12,7 @@ import {
   revokeDevice,
   previewSaudiStarterCatalog,
   importSaudiStarterCatalog,
+  updateOrganization,
 } from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
@@ -61,7 +64,10 @@ export default function AdminView() {
           {t("organization_code")}: <b dir="ltr">{org.login_code}</b>
         </div>
       )}
+      <OrganizationSettings org={org} onUpdated={() => getOrganization().then(setOrg)} />
+      <BranchManagement branches={branches} onChanged={() => getBranchesSummary().then(setBranches)} />
       <DeviceManagement branches={branches} devices={devices} onDevicesChanged={() => getDevices().then(setDevices)} />
+      <EmployeeInvitations branches={branches} />
       <SaudiCatalogImport />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
@@ -147,6 +153,117 @@ export default function AdminView() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function OrganizationSettings({ org, onUpdated }) {
+  const [name, setName] = useState(org?.name || "");
+  const [vatNumber, setVatNumber] = useState(org?.vat_number || "");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setName(org?.name || "");
+    setVatNumber(org?.vat_number || "");
+  }, [org?.id, org?.name, org?.vat_number]);
+
+  async function save() {
+    const result = await updateOrganization(name.trim(), vatNumber.trim());
+    if (result.error) return setMessage(`تعذر الحفظ: ${result.error}`);
+    setMessage("تم حفظ بيانات المنشأة. أصبحت هوية الفاتورة الضريبية جاهزة.");
+    onUpdated();
+  }
+
+  return (
+    <section className="rk-card" style={{ marginBottom: 20 }}>
+      <h3>بيانات المنشأة والفاتورة الضريبية</h3>
+      {!/^\d{15}$/.test(vatNumber) && <p style={{ color: "#b91c1c" }}>لن يسمح النظام بإصدار فاتورة حتى إدخال الرقم الضريبي الصحيح المكوّن من 15 رقمًا.</p>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input className="rk-input" maxLength={200} value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم القانوني للمنشأة" />
+        <input className="rk-input" dir="ltr" inputMode="numeric" maxLength={15} value={vatNumber} onChange={(e) => setVatNumber(e.target.value.replace(/\D/g, ""))} placeholder="الرقم الضريبي (15 رقمًا)" />
+        <button className="rk-btn" disabled={!name.trim() || !/^\d{15}$/.test(vatNumber)} onClick={save}>حفظ بيانات المنشأة</button>
+      </div>
+      {message && <p>{message}</p>}
+    </section>
+  );
+}
+
+function BranchManagement({ branches, onChanged }) {
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function create() {
+    const result = await createBranch(name.trim(), city.trim());
+    if (result.error) return setMessage(`تعذر إنشاء الفرع: ${result.error}`);
+    setName("");
+    setCity("");
+    setMessage("تم إنشاء الفرع بنجاح.");
+    onChanged();
+  }
+
+  return (
+    <section className="rk-card" style={{ marginBottom: 20 }}>
+      <h3>إدارة الفروع</h3>
+      <p>{branches.map((branch) => `${branch.name}${branch.city ? ` — ${branch.city}` : ""}`).join(" | ")}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input className="rk-input" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الفرع" />
+        <input className="rk-input" maxLength={120} value={city} onChange={(e) => setCity(e.target.value)} placeholder="المدينة" />
+        <button className="rk-btn" disabled={!name.trim()} onClick={create}>إضافة فرع</button>
+      </div>
+      {message && <p>{message}</p>}
+    </section>
+  );
+}
+
+function EmployeeInvitations({ branches }) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("seller");
+  const [branchId, setBranchId] = useState("");
+  const [result, setResult] = useState(null);
+  const selectedBranch = branchId || branches[0]?.id || "";
+
+  async function create() {
+    const response = await createInvitation(
+      email.trim(),
+      role,
+      role === "customer" ? null : selectedBranch
+    );
+    if (response.error) {
+      setResult({ error: response.error });
+      return;
+    }
+    const link = `${window.location.origin}${window.location.pathname}#invite=${encodeURIComponent(response.token)}`;
+    setResult({ link, expiresAt: response.invitation.expires_at });
+    setEmail("");
+  }
+
+  return (
+    <section className="rk-card" style={{ marginBottom: 20 }}>
+      <h3>دعوة موظف أو عميل</h3>
+      <p style={{ color: "#666", fontSize: 13 }}>أنشئ رابطًا صالحًا لمدة 48 ساعة. حساب الموظف سيحفظ اسمه ودوره وفرعه في كل عملية.</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input className="rk-input" type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="البريد الإلكتروني" />
+        <select className="rk-select" value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="seller">بائع / كاشير</option>
+          <option value="warehouse_keeper">مأمور مستودع</option>
+          <option value="customer">عميل</option>
+        </select>
+        {role !== "customer" && (
+          <select className="rk-select" value={selectedBranch} onChange={(e) => setBranchId(e.target.value)}>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+        )}
+        <button className="rk-btn" disabled={!email.trim() || (role !== "customer" && !selectedBranch)} onClick={create}>إنشاء الدعوة</button>
+      </div>
+      {result?.error && <p style={{ color: "#b91c1c" }}>تعذر إنشاء الدعوة: {result.error}</p>}
+      {result?.link && (
+        <div style={{ marginTop: 12, padding: 10, background: "#f0fdf4", borderRadius: 8 }}>
+          <b>انسخ هذا الرابط وأرسله للشخص المقصود فقط:</b>
+          <div dir="ltr" style={{ overflowWrap: "anywhere", marginTop: 6 }}>{result.link}</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>ينتهي: {new Date(result.expiresAt).toLocaleString("ar-SA")}</div>
+        </div>
+      )}
+    </section>
   );
 }
 

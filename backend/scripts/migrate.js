@@ -15,6 +15,7 @@ const migrationFiles = [
   "migration_customer_vehicles.sql",
   "migration_tenant_login_codes.sql",
   "migration_inventory_import_audit.sql",
+  "migration_payment_hardening.sql",
   "migration_api_surface_security.sql",
 ];
 

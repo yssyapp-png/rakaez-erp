@@ -5,13 +5,14 @@ import { useLanguage } from "../i18n/LanguageContext.jsx";
 export default function SellerView({ user }) {
   const { t } = useLanguage();
   const [q, setQ] = useState("");
+  const [type, setType] = useState("name");
   const [results, setResults] = useState([]);
   const [cart, setCart] = useState([]); // { partId, name, price, quantity }
   const [paired, setPaired] = useState(isDevicePaired());
   const [pairingCode, setPairingCode] = useState("");
 
   async function onSearch() {
-    setResults(await searchParts(q, "name"));
+    setResults(await searchParts(q, type));
   }
 
   function addToCart(p) {
@@ -62,6 +63,11 @@ export default function SellerView({ user }) {
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
       <div>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="name">{t("search_by_name")}</option>
+            <option value="pn">{t("search_by_pn")}</option>
+            <option value="vin">{t("search_by_vin")}</option>
+          </select>
           <input className="rk-input" style={{ flex: 1 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("seller_search_placeholder")} />
           <button className="rk-btn" onClick={onSearch}>{t("search_btn")}</button>
         </div>

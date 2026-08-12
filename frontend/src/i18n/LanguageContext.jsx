@@ -22,10 +22,10 @@ const STRINGS = {
     lang_toggle: "English",
 
     login_title: "تسجيل الدخول",
-    join_title: "إنشاء حساب عميل",
+    invitation_title: "قبول دعوة المحل",
     new_shop_title: "سجّل متجرك الجديد في ركائز",
     brandSuffix: "ركائز",
-    trial_notice: "يبدأ متجرك بتجربة مجانية 30 يوماً تلقائياً — لا حاجة لبطاقة ائتمان الآن.",
+    trial_notice: "يبدأ متجرك بتجربة مجانية 14 يوماً تلقائياً — لا حاجة لبطاقة ائتمان الآن.",
     full_name: "الاسم الكامل",
     business_name: "اسم المتجر / المنشأة",
     email: "البريد الإلكتروني",
@@ -35,8 +35,11 @@ const STRINGS = {
     shop_owner: "صاحب متجر؟ سجّل متجرك الخاص (تجربة مجانية)",
     organization_code: "رمز المحل (مثال: RKZ-000001)",
     organization_code_hint: "احصل على رمز المحل من مدير المنشأة.",
+    invitation_code: "رمز الدعوة أو افتح الرابط الذي أرسله المدير",
+    have_invitation: "لديك دعوة من مدير المحل؟",
     err_email_taken: "هذا البريد مستخدم مسبقاً",
     err_missing_business_name: "الرجاء إدخال اسم المتجر",
+    err_weak_password: "كلمة المرور يجب أن تكون 12 حرفًا على الأقل وتحتوي على حرف ورقم",
     err_generic: "بيانات الدخول غير صحيحة أو حدث خطأ",
 
     // CustomerView
@@ -154,10 +157,10 @@ const STRINGS = {
     lang_toggle: "العربية",
 
     login_title: "Sign in",
-    join_title: "Create a customer account",
+    invitation_title: "Accept shop invitation",
     new_shop_title: "Register your new shop on Rakaez",
     brandSuffix: "Rakaez",
-    trial_notice: "Your shop starts with an automatic 30-day free trial — no credit card needed yet.",
+    trial_notice: "Your shop starts with an automatic 14-day free trial — no credit card needed yet.",
     full_name: "Full name",
     business_name: "Shop / business name",
     email: "Email",
@@ -167,8 +170,11 @@ const STRINGS = {
     shop_owner: "Shop owner? Register your own shop (free trial)",
     organization_code: "Shop code (example: RKZ-000001)",
     organization_code_hint: "Get the shop code from your organization administrator.",
+    invitation_code: "Invitation code, or open the link shared by the administrator",
+    have_invitation: "Have an invitation from the shop administrator?",
     err_email_taken: "This email is already in use",
     err_missing_business_name: "Please enter a shop name",
+    err_weak_password: "Use at least 12 characters with at least one letter and one number",
     err_generic: "Invalid credentials or something went wrong",
 
     // CustomerView

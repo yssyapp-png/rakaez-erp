@@ -1,7 +1,7 @@
-import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
 
 export function normalizeVin(value) {
   const vin = String(value || "").trim().toUpperCase();
@@ -24,12 +24,19 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const vin = normalizeVin(req.body.vin);
-  const make = String(req.body.make || "").trim();
-  const model = String(req.body.model || "").trim();
-  const modelYear = Number(req.body.modelYear);
+  const body = req.body || {};
+  const vin = normalizeVin(body.vin);
+  const make = String(body.make || "").trim();
+  const model = String(body.model || "").trim();
+  const modelYear = Number(body.modelYear);
   if (!vin) return res.status(400).json({ error: "invalid_vin" });
-  if (!make || !model || !validYear(modelYear)) return res.status(400).json({ error: "vehicle_details_required" });
+  if (!make || make.length > 100 || !model || model.length > 100 || !validYear(modelYear)) {
+    return res.status(400).json({ error: "vehicle_details_required" });
+  }
+  const nickname = String(body.nickname || "").trim().slice(0, 100) || null;
+  const engine = String(body.engine || "").trim().slice(0, 100) || null;
+  const trim = String(body.trim || "").trim().slice(0, 100) || null;
+  const plateNumber = String(body.plateNumber || "").trim().slice(0, 30) || null;
   try {
     const result = await pool.query(
       `INSERT INTO customer_vehicles
@@ -40,8 +47,8 @@ router.post("/", async (req, res) => {
          model_year = EXCLUDED.model_year, engine = EXCLUDED.engine, trim = EXCLUDED.trim,
          plate_number = EXCLUDED.plate_number, updated_at = now()
        RETURNING id, vin, nickname, make, model, model_year, engine, trim, plate_number, created_at, updated_at`,
-      [req.user.organizationId, req.user.id, vin, req.body.nickname || null, make, model, modelYear,
-        req.body.engine || null, req.body.trim || null, req.body.plateNumber || null]
+      [req.user.organizationId, req.user.id, vin, nickname, make, model, modelYear,
+        engine, trim, plateNumber]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

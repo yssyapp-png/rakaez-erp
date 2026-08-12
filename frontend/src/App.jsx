@@ -14,7 +14,7 @@ import logo from "./assets/rakaez-logo.svg";
 const TAB_DEFS = [
   { key: "customer", labelKey: "tab_customer", Comp: CustomerView, roles: ["customer", "seller", "admin"] },
   { key: "seller", labelKey: "tab_seller", Comp: SellerView, roles: ["seller", "admin"] },
-  { key: "parts", labelKey: "tab_parts", Comp: PartsManagementView, roles: ["seller", "admin"] },
+  { key: "parts", labelKey: "tab_parts", Comp: PartsManagementView, roles: ["admin"] },
   { key: "warehouse", labelKey: "tab_warehouse", Comp: WarehouseView, roles: ["warehouse_keeper", "admin"] },
   { key: "admin", labelKey: "tab_admin", Comp: AdminView, roles: ["admin"] },
   { key: "billing", labelKey: "tab_billing", Comp: BillingView, roles: ["admin"] },
@@ -29,7 +29,19 @@ export default function App() {
   useEffect(() => {
     getCurrentUser()
       .then((restoredUser) => {
-        if (restoredUser) setUser(restoredUser);
+        if (restoredUser) {
+          setUser(restoredUser);
+          const pending = sessionStorage.getItem("rakaez_pending_payment");
+          if (pending) {
+            try {
+              const purpose = JSON.parse(pending).purpose;
+              if (purpose === "subscription_activation" && restoredUser.role === "admin") setTab("billing");
+              if (purpose === "online_order") setTab("customer");
+            } catch {
+              sessionStorage.removeItem("rakaez_pending_payment");
+            }
+          }
+        }
       })
       .catch(() => {});
   }, []);
@@ -39,6 +51,7 @@ export default function App() {
 
   function onLogout() {
     logout();
+    sessionStorage.removeItem("rakaez_pending_payment");
     setUser(null);
     setTab("customer");
   }

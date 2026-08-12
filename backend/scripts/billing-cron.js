@@ -26,10 +26,19 @@
  * Example crontab entry (once daily at 3am): 0 3 * * * cd /path/to/backend && node scripts/billing-cron.js >> billing.log 2>&1
  */
 import dotenv from "dotenv";
+import crypto from "crypto";
 import { pool } from "../src/db/pool.js";
-import { createMoyasarPayment } from "../src/utils/moyasar.js";
+import { createMoyasarPayment, paymentMatches, refundableAmount, refundMoyasarPayment } from "../src/utils/moyasar.js";
 
 dotenv.config();
+if (process.env.PAYMENTS_ENABLED !== "true") {
+  console.log("[billing-cron] payments are disabled; no subscription charges were attempted");
+  process.exit(0);
+}
+if (!process.env.MOYASAR_SECRET_KEY) {
+  console.error("[billing-cron] MOYASAR_SECRET_KEY is required when payments are enabled");
+  process.exit(1);
+}
 
 // Kept identical to billing.js's YEARLY_MONTHS_CHARGED on purpose — a yearly
 // renewal must charge the same amount as a fresh yearly activation would.
@@ -62,30 +71,94 @@ async function chargeDueRenewals() {
     const amountSar = isYearly ? Number(org.plan_price_sar) * YEARLY_MONTHS_CHARGED : Number(org.plan_price_sar);
     const intervalSql = isYearly ? "interval '1 year'" : "interval '1 month'";
 
+    const proposedGivenId = crypto.randomUUID();
+    const attempt = await pool.query(
+      `INSERT INTO billing_renewal_attempts
+       (organization_id, scheduled_for, given_id, amount_halalas, billing_interval)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (organization_id, scheduled_for) DO UPDATE SET updated_at = billing_renewal_attempts.updated_at
+       RETURNING id, given_id, status`,
+      [org.id, org.next_billing_at, proposedGivenId, Math.round(amountSar * 100), org.billing_interval]
+    );
+    if (attempt.rows[0].status !== "pending") continue;
+    const givenId = attempt.rows[0].given_id;
+
     try {
       const payment = await createMoyasarPayment({
         amountHalalas: Math.round(amountSar * 100),
         source: { type: "token", token: org.moyasar_card_token },
         description: `تجديد اشتراك ركائز - ${org.name} - ${isYearly ? "سنوي" : "شهري"}`,
+        givenId,
+        metadata: {
+          rakaez_purpose: "subscription_renewal",
+          rakaez_organization_id: String(org.id),
+          rakaez_scheduled_for: new Date(org.next_billing_at).toISOString(),
+        },
       });
 
-      if (payment.status === "paid") {
-        await pool.query(
-          `UPDATE organizations SET next_billing_at = next_billing_at + ${intervalSql}, subscription_status = 'active' WHERE id = $1`,
-          [org.id]
-        );
+      if (paymentMatches(payment, Math.round(amountSar * 100), "SAR")) {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(
+            `INSERT INTO subscription_payments
+             (organization_id, payment_reference, purpose, amount_halalas, currency, billing_interval, status)
+             VALUES ($1,$2,'renewal',$3,'SAR',$4,'paid')
+             ON CONFLICT (payment_reference) DO NOTHING`,
+            [org.id, payment.id, Math.round(amountSar * 100), org.billing_interval]
+          );
+          await client.query(
+            `UPDATE organizations SET next_billing_at = next_billing_at + ${intervalSql}, subscription_status = 'active'
+             WHERE id = $1 AND next_billing_at = $2`,
+            [org.id, org.next_billing_at]
+          );
+          await client.query(
+            `UPDATE billing_renewal_attempts SET status='paid', payment_reference=$1, updated_at=now()
+             WHERE id=$2`,
+            [payment.id, attempt.rows[0].id]
+          );
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK").catch(() => {});
+          throw error;
+        } finally {
+          client.release();
+        }
         console.log(`[billing-cron] renewed org ${org.id} (${org.name}, ${org.billing_interval}) successfully`);
       } else {
-        await pool.query(`UPDATE organizations SET subscription_status = 'past_due' WHERE id = $1`, [org.id]);
+        const isSettled = ["paid", "captured"].includes(payment.status);
+        const refundAmount = refundableAmount(payment);
+        const refund = isSettled && refundAmount > 0
+          ? await refundMoyasarPayment(payment.id, refundAmount)
+          : null;
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(`UPDATE organizations SET subscription_status = 'past_due' WHERE id = $1`, [org.id]);
+          await client.query(
+            `UPDATE billing_renewal_attempts SET status='failed', payment_reference=$1, error_message=$2, updated_at=now()
+             WHERE id=$3`,
+            [payment.id || null, `payment_status:${payment.status};refunded:${refund?.ok ?? false}`, attempt.rows[0].id]
+          );
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK").catch(() => {});
+          throw error;
+        } finally {
+          client.release();
+        }
         console.warn(`[billing-cron] renewal not paid for org ${org.id} (${org.name}): status=${payment.status}`);
       }
     } catch (err) {
-      await pool.query(`UPDATE organizations SET subscription_status = 'past_due' WHERE id = $1`, [org.id]);
+      await pool.query(
+        `UPDATE billing_renewal_attempts SET error_message=$1, updated_at=now() WHERE id=$2`,
+        [String(err.message || "renewal_failed").slice(0, 500), attempt.rows[0].id]
+      );
       console.error(`[billing-cron] renewal FAILED for org ${org.id} (${org.name}):`, err.message);
-      // NOTE: no automatic retry loop here on purpose — retrying a declined
-      // card immediately rarely helps and can trigger fraud flags. A real
-      // dunning flow (retry in 3 days, then 7, then cancel) is the next
-      // step once this basic version is proven working.
+      // Keep the attempt pending. A later scheduled run reuses the same
+      // Moyasar given_id, so a timeout can be recovered idempotently without
+      // creating a second charge. Declined payments are marked failed above
+      // and require a future dunning policy rather than an immediate retry.
     }
   }
 }

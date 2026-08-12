@@ -1,7 +1,7 @@
-import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
 
 export const SAUDI_STARTER_CATALOG = [
   ["oil-filter", "فلتر زيت المحرك", "فلاتر"],
@@ -31,7 +31,7 @@ router.get("/saudi-starter/preview", (_req, res) => {
 });
 
 router.post("/saudi-starter/import", async (req, res) => {
-  if (req.body.confirm !== true) return res.status(400).json({ error: "explicit_confirmation_required" });
+  if (req.body?.confirm !== true) return res.status(400).json({ error: "explicit_confirmation_required" });
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -69,11 +69,14 @@ router.post("/saudi-starter/import", async (req, res) => {
 });
 
 router.post("/parts/:partId/applications", async (req, res) => {
-  const make = String(req.body.make || "").trim();
-  const model = String(req.body.model || "").trim();
-  const yearFrom = req.body.yearFrom == null ? null : Number(req.body.yearFrom);
-  const yearTo = req.body.yearTo == null ? null : Number(req.body.yearTo);
-  if (!make || !model || (yearFrom != null && !Number.isInteger(yearFrom)) || (yearTo != null && !Number.isInteger(yearTo))) {
+  const body = req.body || {};
+  const make = String(body.make || "").trim();
+  const model = String(body.model || "").trim();
+  const yearFrom = body.yearFrom == null ? null : Number(body.yearFrom);
+  const yearTo = body.yearTo == null ? null : Number(body.yearTo);
+  if (!make || make.length > 100 || !model || model.length > 100 ||
+      (yearFrom != null && (!Number.isInteger(yearFrom) || yearFrom < 1900 || yearFrom > 2200)) ||
+      (yearTo != null && (!Number.isInteger(yearTo) || yearTo < 1900 || yearTo > 2200))) {
     return res.status(400).json({ error: "invalid_vehicle_application" });
   }
   if (yearFrom != null && yearTo != null && yearFrom > yearTo) {
@@ -87,9 +90,10 @@ router.post("/parts/:partId/applications", async (req, res) => {
   const result = await pool.query(
     `INSERT INTO vehicle_applications
      (organization_id, part_id, make, model, year_from, year_to, engine, trim, market, source, verification_status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'SA','manual','verified') RETURNING *`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'SA','manual','unverified') RETURNING *`,
     [req.user.organizationId, req.params.partId, make, model, yearFrom, yearTo,
-      req.body.engine || null, req.body.trim || null]
+      String(body.engine || "").trim().slice(0, 100) || null,
+      String(body.trim || "").trim().slice(0, 100) || null]
   );
   res.status(201).json(result.rows[0]);
 });

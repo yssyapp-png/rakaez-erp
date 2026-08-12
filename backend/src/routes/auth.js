@@ -1,18 +1,43 @@
-import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { pool } from "../db/pool.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "12h";
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
   throw new Error("JWT_SECRET must be configured with at least 32 characters");
 }
 
+export function isAcceptablePassword(value) {
+  const password = String(value || "");
+  return password.length >= 12 && password.length <= 128 && /\p{L}/u.test(password) && /\d/u.test(password);
+}
+
+function issueAccessToken(user) {
+  return jwt.sign(
+    { id: user.id, role: user.role, branchId: user.branch_id ?? user.branchId, organizationId: user.organization_id ?? user.organizationId },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    branchId: user.branch_id ?? user.branchId ?? null,
+    organizationId: user.organization_id ?? user.organizationId,
+    email: user.email,
+  };
+}
+
 /**
  * POST /api/auth/register
- * body: { name, email, password, role, branchId?, businessName?, organizationId? }
+ * body: { name, email, password, role: "admin", businessName }
  *
  * Multi-tenant signup rules:
  *  - role "admin" with NO organizationId → this is a shop owner signing up
@@ -20,15 +45,26 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
  *    them automatically, seeded with a trial subscription and one default
  *    branch, and make them its first admin. This is the self-signup flow
  *    the SaaS go-to-market plan depends on — no manual provisioning needed.
- *  - role "seller"/"customer" MUST pass an existing organizationId (their
- *    employer's or the shop's id) — they're joining a tenant, not creating
- *    one. Real deployments would replace this with an invite-link/shop-code
- *    flow instead of a raw id, but the isolation rule is what matters here.
+ *  - Staff and customer accounts can only be created from a one-time invite
+ *    issued by an authenticated tenant administrator.
  */
 router.post("/register", async (req, res) => {
-  const { name, email, password, role = "customer", branchId = null, businessName, organizationId } = req.body;
+  const body = req.body || {};
+  const name = String(body.name || "").trim();
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  const role = body.role || "customer";
+  const branchId = body.branchId ?? null;
+  const businessName = String(body.businessName || "").trim();
+  const organizationId = body.organizationId;
   if (!name || !email || !password) {
     return res.status(400).json({ error: "missing_fields" });
+  }
+  if (name.length > 120 || businessName.length > 200 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "invalid_registration_fields" });
+  }
+  if (!isAcceptablePassword(password)) {
+    return res.status(400).json({ error: "weak_password" });
   }
   // Public registration creates a brand-new tenant owner only. Joining an
   // existing tenant must go through the authenticated invitation flow.
@@ -74,7 +110,7 @@ router.post("/register", async (req, res) => {
       return res.status(409).json({ error: "email_taken" });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 12);
     const finalBranchId = branchId || req._defaultBranchId || null;
     const result = await client.query(
       `INSERT INTO users (organization_id, name, role, branch_id, email, password_hash)
@@ -85,12 +121,8 @@ router.post("/register", async (req, res) => {
 
     await client.query("COMMIT");
 
-    const token = jwt.sign(
-      { id: user.id, role: user.role, branchId: user.branch_id, organizationId: user.organization_id },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-    res.json({ user, token, organizationCode: newOrganizationCode });
+    const token = issueAccessToken(user);
+    res.json({ user: publicUser(user), token, organizationCode: newOrganizationCode });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error(err);
@@ -102,19 +134,15 @@ router.post("/register", async (req, res) => {
 
 /**
  * POST /api/auth/login
- * body: { email, password, organizationId? }
- * NOTE: because email is only unique WITHIN an organization now (two shops
- * can each have a "seller1@example.com"), a bare email/password isn't
- * enough to identify one account across the whole system. For this MVP we
- * resolve by taking the first matching account if organizationId isn't
- * given — fine for a single demo tenant, but a real multi-tenant launch
- * needs a shop-selection step (e.g. a subdomain per shop, or "which shop
- * do you work at?" screen) before login.
+ * body: { email, password, organizationCode }
+ * Email addresses are unique only inside a tenant, so the public shop code
+ * is required and the lookup can never silently select another shop's user.
  */
 router.post("/login", async (req, res) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
-  const password = String(req.body.password || "");
-  const organizationCode = String(req.body.organizationCode || "").trim().toUpperCase();
+  const body = req.body || {};
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  const organizationCode = String(body.organizationCode || "").trim().toUpperCase();
   if (!email || !password || !organizationCode) {
     return res.status(400).json({ error: "missing_login_fields" });
   }
@@ -132,20 +160,9 @@ router.post("/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "invalid_credentials" });
 
-    const token = jwt.sign(
-      { id: user.id, role: user.role, branchId: user.branch_id, organizationId: user.organization_id },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = issueAccessToken(user);
     res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        branchId: user.branch_id,
-        organizationId: user.organization_id,
-        email: user.email,
-      },
+      user: publicUser(user),
       token,
     });
   } catch (err) {
@@ -156,10 +173,11 @@ router.post("/login", async (req, res) => {
 
 /** POST /api/auth/accept-invitation — creates an account from a one-time invite. */
 router.post("/accept-invitation", async (req, res) => {
-  const token = String(req.body.token || "");
-  const name = String(req.body.name || "").trim();
-  const password = String(req.body.password || "");
-  if (!token || !name || password.length < 8) {
+  const body = req.body || {};
+  const token = String(body.token || "");
+  const name = String(body.name || "").trim();
+  const password = String(body.password || "");
+  if (!token || !name || name.length > 120 || !isAcceptablePassword(password)) {
     return res.status(400).json({ error: "invalid_invitation_signup" });
   }
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -195,12 +213,8 @@ router.post("/accept-invitation", async (req, res) => {
     await client.query("UPDATE organization_invites SET used_at = now() WHERE id = $1", [invite.id]);
     await client.query("COMMIT");
     const user = userResult.rows[0];
-    const jwtToken = jwt.sign(
-      { id: user.id, role: user.role, branchId: user.branch_id, organizationId: user.organization_id },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-    res.status(201).json({ user, token: jwtToken });
+    const jwtToken = issueAccessToken(user);
+    res.status(201).json({ user: publicUser(user), token: jwtToken });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error(err);
@@ -233,14 +247,15 @@ router.get("/me", authRequired, async (req, res) => {
 
 /** PUT /api/auth/me — update the logged-in user's own name. */
 router.put("/me", authRequired, async (req, res) => {
-  const { name } = req.body;
-  if (!name || !name.trim()) {
+  const name = String(req.body?.name || "").trim();
+  if (!name || name.length > 120) {
     return res.status(400).json({ error: "name_required" });
   }
   try {
     const result = await pool.query(
-      `UPDATE users SET name = $1 WHERE id = $2 RETURNING id, name, role, branch_id, email`,
-      [name.trim(), req.user.id]
+      `UPDATE users SET name = $1 WHERE id = $2 AND organization_id = $3
+       RETURNING id, organization_id, name, role, branch_id, email`,
+      [name, req.user.id, req.user.organizationId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "user_not_found" });
@@ -254,8 +269,7 @@ router.put("/me", authRequired, async (req, res) => {
       email: row.email,
       organizationId: req.user.organizationId,
     };
-    // Reissue the token so the new name is reflected in future requests too.
-    const token = jwt.sign(user, JWT_SECRET, { expiresIn: "30d" });
+    const token = issueAccessToken(user);
     res.json({ user, token });
   } catch (err) {
     console.error(err);

@@ -1,18 +1,19 @@
 import crypto from "crypto";
-import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { authRequired, requireRole } from "./auth.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
 
 function hashSecret(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 router.post("/pairing-code", authRequired, requireRole("admin"), async (req, res) => {
-  const branchId = Number(req.body.branchId);
-  const deviceName = String(req.body.deviceName || "").trim();
-  if (!Number.isInteger(branchId) || !deviceName) {
+  const body = req.body || {};
+  const branchId = Number(body.branchId);
+  const deviceName = String(body.deviceName || "").trim();
+  if (!Number.isInteger(branchId) || !deviceName || deviceName.length > 120) {
     return res.status(400).json({ error: "invalid_device_details" });
   }
   const branch = await pool.query(
@@ -32,7 +33,7 @@ router.post("/pairing-code", authRequired, requireRole("admin"), async (req, res
 });
 
 router.post("/pair", async (req, res) => {
-  const code = String(req.body.code || "").trim();
+  const code = String(req.body?.code || "").trim();
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "invalid_pairing_code" });
   const client = await pool.connect();
   try {

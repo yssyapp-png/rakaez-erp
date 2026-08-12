@@ -31,6 +31,17 @@ export async function register(payload) {
   return data;
 }
 
+export async function acceptInvitation(token, name, password) {
+  const res = await fetch(`${BASE}/auth/accept-invitation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, name, password }),
+  });
+  const data = await res.json();
+  if (data.token) localStorage.setItem("token", data.token);
+  return data;
+}
+
 export async function getCurrentUser() {
   const res = await fetch(`${BASE}/auth/me`, { headers: authHeaders() });
   if (!res.ok) return null;
@@ -40,6 +51,8 @@ export async function getCurrentUser() {
 
 export function logout() {
   localStorage.removeItem("token");
+  localStorage.removeItem("deviceToken");
+  sessionStorage.removeItem("rakaez_pending_payment");
 }
 
 export async function searchParts(q, type = "name") {
@@ -47,6 +60,25 @@ export async function searchParts(q, type = "name") {
   const res = await fetch(`${BASE}/parts/search?q=${encodeURIComponent(q)}&type=${type}`, {
     headers: authHeaders(),
   });
+  return res.json();
+}
+
+export async function getVehicles() {
+  const res = await fetch(`${BASE}/vehicles`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function saveVehicle(payload) {
+  const res = await fetch(`${BASE}/vehicles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export async function deleteVehicle(id) {
+  const res = await fetch(`${BASE}/vehicles/${id}`, { method: "DELETE", headers: authHeaders() });
   return res.json();
 }
 
@@ -59,12 +91,12 @@ export async function checkout(branchId, items) {
   return res.json();
 }
 
-/** Customer-facing checkout: charges the card via Moyasar server-side, then creates the invoice. */
-export async function checkoutOnline(branchId, items, moyasarToken) {
+/** Customer checkout: the server verifies the hosted-form payment, then creates the invoice. */
+export async function checkoutOnline(branchId, items, paymentId, requestReference) {
   const res = await fetch(`${BASE}/sales/checkout-online`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ branchId, items, moyasarToken }),
+    body: JSON.stringify({ branchId, items, paymentId, requestReference }),
   });
   return res.json();
 }
@@ -74,8 +106,26 @@ export async function getAdminStats() {
   return res.json();
 }
 
+export async function createInvitation(email, role, branchId) {
+  const res = await fetch(`${BASE}/admin/invitations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ email, role, branchId: branchId || null }),
+  });
+  return res.json();
+}
+
 export async function getBranchesSummary() {
   const res = await fetch(`${BASE}/admin/branches-summary`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function createBranch(name, city) {
+  const res = await fetch(`${BASE}/admin/branches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name, city }),
+  });
   return res.json();
 }
 
@@ -86,6 +136,15 @@ export async function getInventoryMovements() {
 
 export async function getOrganization() {
   const res = await fetch(`${BASE}/admin/organization`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function updateOrganization(name, vatNumber) {
+  const res = await fetch(`${BASE}/admin/organization`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name, vatNumber }),
+  });
   return res.json();
 }
 
@@ -183,15 +242,14 @@ export async function getBillingStatus() {
 }
 
 /**
- * Saves the card (reusable token) and charges the first billing cycle now —
- * every renewal after this is fully automatic. `interval` is 'monthly' or
- * 'yearly'; defaults to monthly on the server if omitted.
+ * Verifies the hosted-form payment, saves its reusable card token, and
+ * activates recurring billing. `interval` is 'monthly' or 'yearly'.
  */
-export async function activateSubscription(moyasarToken, interval = "monthly") {
+export async function activateSubscription(paymentId, requestReference, interval = "monthly") {
   const res = await fetch(`${BASE}/billing/activate-subscription`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ moyasarToken, interval }),
+    body: JSON.stringify({ paymentId, requestReference, interval }),
   });
   return res.json();
 }

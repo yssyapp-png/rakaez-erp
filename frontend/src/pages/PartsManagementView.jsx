@@ -12,7 +12,7 @@ import {
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 /**
- * Lets a shop owner/seller manage their own catalog and stock levels from
+ * Lets a shop owner manage their own catalog and stock levels from
  * the dashboard — no developer involvement needed after they subscribe.
  * This is the piece that turns Rakaez from "a system I configure for you"
  * into a self-serve platform other shops can run themselves.
@@ -143,8 +143,10 @@ export default function PartsManagementView() {
                   <span key={b.id} style={{ marginInlineEnd: 10, fontSize: 12 }}>
                     {b.name}:{" "}
                     <input
+                      key={`${part.id}-${b.id}-${part.inventory?.find((item) => Number(item.branch_id) === Number(b.id))?.quantity ?? 0}`}
                       type="number"
-                      defaultValue={0}
+                      min="0"
+                      defaultValue={part.inventory?.find((item) => Number(item.branch_id) === Number(b.id))?.quantity ?? 0}
                       style={{ width: 50 }}
                       onBlur={(e) => onStockChange(part, b.id, e.target.value)}
                     />
