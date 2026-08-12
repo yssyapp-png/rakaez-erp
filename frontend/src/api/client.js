@@ -153,6 +153,13 @@ export async function issueInventory(partId, quantity, note) {
   return res.json();
 }
 
+export async function findPartsByShelf(code) {
+  const res = await fetch(`${BASE}/parts/shelf-lookup?code=${encodeURIComponent(code)}`, {
+    headers: authHeaders(),
+  });
+  return res.json();
+}
+
 export async function getInvoices() {
   const res = await fetch(`${BASE}/sales/invoices`, { headers: authHeaders() });
   return res.json();

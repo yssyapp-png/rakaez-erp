@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isNonNegativeInteger, isNonNegativeMoney, validateImportRows } from "../src/routes/parts.js";
+import { isNonNegativeInteger, isNonNegativeMoney, normalizeShelfLookup, validateImportRows } from "../src/routes/parts.js";
 import { hasValidItems } from "../src/routes/sales.js";
 import { subscriptionAllowsAccess } from "../src/routes/auth.js";
 import { SAUDI_STARTER_CATALOG } from "../src/routes/catalog.js";
@@ -99,4 +99,18 @@ test("CSV inventory import records an auditable run and inventory movements", as
   assert.match(source, /'catalog_import'/);
   assert.match(source, /updated_count=\$2/);
   assert.match(source, /row\.quantity - previousQuantity/);
+});
+
+test("shelf lookup normalizes physical labels and rejects unsafe lengths", () => {
+  assert.equal(normalizeShelfLookup(" a - 15 "), "A-15");
+  assert.equal(normalizeShelfLookup(" 15 "), "15");
+  assert.equal(normalizeShelfLookup(""), null);
+  assert.equal(normalizeShelfLookup("A".repeat(101)), null);
+});
+
+test("shelf lookup is scoped to the paired device branch and tenant", async () => {
+  const source = await fs.readFile(new URL("../src/routes/parts.js", import.meta.url), "utf8");
+  assert.match(source, /i\.branch_id = \$2/);
+  assert.match(source, /p\.organization_id = \$1/);
+  assert.match(source, /router\.get\("\/shelf-lookup", deviceRequired/);
 });

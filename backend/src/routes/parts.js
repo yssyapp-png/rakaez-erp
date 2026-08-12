@@ -65,6 +65,11 @@ export function validateImportRows(rows, mode = "skip") {
   return { validRows, errors, mode };
 }
 
+export function normalizeShelfLookup(value) {
+  const normalized = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  return normalized && normalized.length <= 100 ? normalized : null;
+}
+
 async function branchBelongsToOrganization(client, branchId, organizationId) {
   const result = await client.query(
     "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
@@ -268,6 +273,34 @@ router.post("/import/commit", requireRole("admin"), async (req, res) => {
     res.status(500).json({ error: "inventory_import_failed" });
   } finally {
     client.release();
+  }
+});
+
+/** Finds stock by its physical shelf label, scoped to this paired device's branch. */
+router.get("/shelf-lookup", deviceRequired, async (req, res) => {
+  if (!["admin", "seller", "warehouse_keeper"].includes(req.user.role)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const shelfCode = normalizeShelfLookup(req.query.code);
+  if (!shelfCode) return res.status(400).json({ error: "invalid_shelf_code" });
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.part_number, p.name, p.brand, p.barcode,
+              i.quantity, i.min_quantity, i.shelf_section, i.shelf_number, i.shelf_level
+       FROM inventory i
+       JOIN parts p ON p.id = i.part_id
+       WHERE p.organization_id = $1 AND i.branch_id = $2
+         AND (
+           upper(regexp_replace(coalesce(i.shelf_number,''), '\\s+', '', 'g')) = $3
+           OR upper(regexp_replace(concat_ws('-', i.shelf_section, i.shelf_number), '\\s+', '', 'g')) = $3
+         )
+       ORDER BY p.name`,
+      [req.user.organizationId, req.device.branch_id, shelfCode]
+    );
+    res.json({ shelfCode, branchId: req.device.branch_id, count: result.rows.length, parts: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "shelf_lookup_failed" });
   }
 });
 
