@@ -1,6 +1,6 @@
 import { pool } from "../db/pool.js";
 import { requireRole } from "./auth.js";
-import { fetchMoyasarPayment, isUuid, paymentMatches, refundableAmount, refundMoyasarPayment } from "../utils/moyasar.js";
+import { fetchMoyasarPayment, isUuid, paymentMatches, refundOutstandingMoyasarPayment } from "../utils/moyasar.js";
 import { createSafeRouter } from "../utils/safe-router.js";
 
 const router = createSafeRouter();
@@ -60,7 +60,17 @@ router.post("/activate-subscription", requireRole("admin"), async (req, res) => 
   const orgId = req.user.organizationId;
   const client = await pool.connect();
   let verifiedPayment = null;
+  let paymentLockHeld = false;
   try {
+    const lockResult = await client.query(
+      "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
+      [`rakaez:subscription-payment:${paymentId}`]
+    );
+    if (!lockResult.rows[0]?.acquired) {
+      res.setHeader("Retry-After", "2");
+      return res.status(409).json({ error: "payment_processing_in_progress", retryable: true });
+    }
+    paymentLockHeld = true;
     const orgRes = await client.query("SELECT * FROM organizations WHERE id = $1", [orgId]);
     const org = orgRes.rows[0];
     if (!org) return res.status(404).json({ error: "organization_not_found" });
@@ -87,9 +97,8 @@ router.post("/activate-subscription", requireRole("admin"), async (req, res) => 
     }
     if (!paymentMatches(payment, expectedAmountHalalas, "SAR")) {
       const isSettled = ["paid", "captured"].includes(payment.status);
-      const refundAmount = refundableAmount(payment);
-      const refund = isSettled && refundAmount > 0
-        ? await refundMoyasarPayment(payment.id, refundAmount)
+      const refund = isSettled
+        ? await refundOutstandingMoyasarPayment(payment.id)
         : null;
       return res.status(402).json({
         error: "payment_verification_failed",
@@ -103,7 +112,7 @@ router.post("/activate-subscription", requireRole("admin"), async (req, res) => 
     if (!reusableToken) {
       // Charged the customer but Moyasar didn't hand back a reusable token —
       // don't silently pretend recurring billing is set up when it isn't.
-      const refund = await refundMoyasarPayment(payment.id, expectedAmountHalalas);
+      const refund = await refundOutstandingMoyasarPayment(payment.id);
       return res.status(500).json({
         error: "no_reusable_token",
         refunded: refund.ok,
@@ -156,17 +165,14 @@ router.post("/activate-subscription", requireRole("admin"), async (req, res) => 
     console.error(err);
     if (verifiedPayment) {
       try {
-        const existing = await pool.query(
+        const existing = await client.query(
           "SELECT id FROM subscription_payments WHERE organization_id = $1 AND payment_reference = $2",
           [orgId, verifiedPayment.id]
         );
         if (existing.rows[0]) {
           return res.json({ ok: true, idempotent: true, message: "الاشتراك مفعّل مسبقًا بهذه الدفعة." });
         }
-        const refundAmount = refundableAmount(verifiedPayment);
-        const refund = refundAmount > 0
-          ? await refundMoyasarPayment(verifiedPayment.id, refundAmount)
-          : { ok: false };
+        const refund = await refundOutstandingMoyasarPayment(verifiedPayment.id);
         return res.status(409).json({
           error: "activation_failed",
           refunded: refund.ok,
@@ -185,6 +191,12 @@ router.post("/activate-subscription", requireRole("admin"), async (req, res) => 
     }
     res.status(400).json({ error: "activation_failed" });
   } finally {
+    if (paymentLockHeld) {
+      await client.query(
+        "SELECT pg_advisory_unlock(hashtextextended($1, 0))",
+        [`rakaez:subscription-payment:${paymentId}`]
+      ).catch(() => {});
+    }
     client.release();
   }
 });

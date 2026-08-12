@@ -9,12 +9,15 @@ The first web release is a private beta with online payments disabled.
 ## Services
 
 1. Managed PostgreSQL database.
-2. Node.js backend deployed from `backend/`.
-3. Static React frontend deployed from `frontend/`.
+2. One production image built from the repository root using `backend/Dockerfile`.
+3. The image builds React, copies only `frontend/dist` into the Node service,
+   and serves the web app and `/api` from one HTTPS origin. Source, SQL, `.env`,
+   tests, and repository metadata are excluded by `.dockerignore`.
 
 ## Backend release command
 
-Run database migrations once for every release, then start the API:
+Run database migrations once for every release, then start the API. The Docker
+build context must be the repository root, not `backend/`:
 
 ```text
 npm ci --ignore-scripts
@@ -34,7 +37,10 @@ JWT_SECRET=<random-secret-at-least-32-characters>
 JWT_EXPIRES_IN=12h
 CORS_ALLOWED_ORIGINS=https://your-web-domain.example
 TRUST_PROXY=true
+ENFORCE_HTTPS=true
 PAYMENTS_ENABLED=false
+MOYASAR_CALLBACK_URL=https://your-web-domain.example
+MOYASAR_TIMEOUT_MS=15000
 ```
 
 Do not configure Moyasar live keys during the private beta.
@@ -57,6 +63,12 @@ npm run build
 
 Publish directory: `dist`
 
+The recommended and tested configuration is the combined production image.
+If the frontend is hosted on a separate domain, that host must set an equivalent
+CSP whose `connect-src` explicitly allows the API origin, and the API CORS list
+must allow only the web origin. The server exposes compiled assets only; never
+publish the repository directory.
+
 Environment variables when the API uses a separate domain:
 
 ```text
@@ -71,6 +83,10 @@ the backend. Never put the secret key in the frontend or repository.
 ## Release gates
 
 - Database backup completed before migrations.
+- `sh scripts/security-check.sh` passes.
+- Use Node 20 or 22; Node 23+ is outside the supported release range.
+- If npm's old cache fails, run `sh scripts/repair-npm-cache.sh`; do not delete
+  the global cache. The command requires access to `registry.npmjs.org`.
 - `npm test` passes in both `backend/` and `frontend/`.
 - `npm run build` passes in `frontend/`.
 - `npm audit` passes for backend and frontend.

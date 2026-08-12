@@ -28,7 +28,7 @@
 import dotenv from "dotenv";
 import crypto from "crypto";
 import { pool } from "../src/db/pool.js";
-import { createMoyasarPayment, paymentMatches, refundableAmount, refundMoyasarPayment } from "../src/utils/moyasar.js";
+import { createMoyasarPayment, paymentMatches, refundOutstandingMoyasarPayment } from "../src/utils/moyasar.js";
 
 dotenv.config();
 if (process.env.PAYMENTS_ENABLED !== "true") {
@@ -44,8 +44,8 @@ if (!process.env.MOYASAR_SECRET_KEY) {
 // renewal must charge the same amount as a fresh yearly activation would.
 const YEARLY_MONTHS_CHARGED = 10;
 
-async function markTrialsExpiredWithoutPayment() {
-  const r = await pool.query(
+async function markTrialsExpiredWithoutPayment(db) {
+  const r = await db.query(
     `UPDATE organizations
      SET subscription_status = 'past_due'
      WHERE subscription_status = 'trialing'
@@ -58,8 +58,8 @@ async function markTrialsExpiredWithoutPayment() {
   }
 }
 
-async function chargeDueRenewals() {
-  const due = await pool.query(
+async function chargeDueRenewals(db) {
+  const due = await db.query(
     `SELECT * FROM organizations
      WHERE subscription_status = 'active'
        AND moyasar_card_token IS NOT NULL
@@ -72,7 +72,7 @@ async function chargeDueRenewals() {
     const intervalSql = isYearly ? "interval '1 year'" : "interval '1 month'";
 
     const proposedGivenId = crypto.randomUUID();
-    const attempt = await pool.query(
+    const attempt = await db.query(
       `INSERT INTO billing_renewal_attempts
        (organization_id, scheduled_for, given_id, amount_halalas, billing_interval)
        VALUES ($1,$2,$3,$4,$5)
@@ -89,6 +89,7 @@ async function chargeDueRenewals() {
         source: { type: "token", token: org.moyasar_card_token },
         description: `تجديد اشتراك ركائز - ${org.name} - ${isYearly ? "سنوي" : "شهري"}`,
         givenId,
+        callbackUrl: process.env.MOYASAR_CALLBACK_URL,
         metadata: {
           rakaez_purpose: "subscription_renewal",
           rakaez_organization_id: String(org.id),
@@ -97,60 +98,53 @@ async function chargeDueRenewals() {
       });
 
       if (paymentMatches(payment, Math.round(amountSar * 100), "SAR")) {
-        const client = await pool.connect();
         try {
-          await client.query("BEGIN");
-          await client.query(
+          await db.query("BEGIN");
+          await db.query(
             `INSERT INTO subscription_payments
              (organization_id, payment_reference, purpose, amount_halalas, currency, billing_interval, status)
              VALUES ($1,$2,'renewal',$3,'SAR',$4,'paid')
              ON CONFLICT (payment_reference) DO NOTHING`,
             [org.id, payment.id, Math.round(amountSar * 100), org.billing_interval]
           );
-          await client.query(
+          await db.query(
             `UPDATE organizations SET next_billing_at = next_billing_at + ${intervalSql}, subscription_status = 'active'
              WHERE id = $1 AND next_billing_at = $2`,
             [org.id, org.next_billing_at]
           );
-          await client.query(
+          await db.query(
             `UPDATE billing_renewal_attempts SET status='paid', payment_reference=$1, updated_at=now()
              WHERE id=$2`,
             [payment.id, attempt.rows[0].id]
           );
-          await client.query("COMMIT");
+          await db.query("COMMIT");
         } catch (error) {
-          await client.query("ROLLBACK").catch(() => {});
+          await db.query("ROLLBACK").catch(() => {});
           throw error;
-        } finally {
-          client.release();
         }
         console.log(`[billing-cron] renewed org ${org.id} (${org.name}, ${org.billing_interval}) successfully`);
       } else {
         const isSettled = ["paid", "captured"].includes(payment.status);
-        const refundAmount = refundableAmount(payment);
-        const refund = isSettled && refundAmount > 0
-          ? await refundMoyasarPayment(payment.id, refundAmount)
+        const refund = isSettled
+          ? await refundOutstandingMoyasarPayment(payment.id)
           : null;
-        const client = await pool.connect();
         try {
-          await client.query("BEGIN");
-          await client.query(`UPDATE organizations SET subscription_status = 'past_due' WHERE id = $1`, [org.id]);
-          await client.query(
+          await db.query("BEGIN");
+          await db.query(`UPDATE organizations SET subscription_status = 'past_due' WHERE id = $1`, [org.id]);
+          await db.query(
             `UPDATE billing_renewal_attempts SET status='failed', payment_reference=$1, error_message=$2, updated_at=now()
              WHERE id=$3`,
             [payment.id || null, `payment_status:${payment.status};refunded:${refund?.ok ?? false}`, attempt.rows[0].id]
           );
-          await client.query("COMMIT");
+          await db.query("COMMIT");
         } catch (error) {
-          await client.query("ROLLBACK").catch(() => {});
+          await db.query("ROLLBACK").catch(() => {});
           throw error;
-        } finally {
-          client.release();
         }
         console.warn(`[billing-cron] renewal not paid for org ${org.id} (${org.name}): status=${payment.status}`);
       }
     } catch (err) {
-      await pool.query(
+      await db.query(
         `UPDATE billing_renewal_attempts SET error_message=$1, updated_at=now() WHERE id=$2`,
         [String(err.message || "renewal_failed").slice(0, 500), attempt.rows[0].id]
       );
@@ -165,10 +159,23 @@ async function chargeDueRenewals() {
 
 async function main() {
   console.log(`[billing-cron] run started ${new Date().toISOString()}`);
-  await markTrialsExpiredWithoutPayment();
-  await chargeDueRenewals();
-  console.log(`[billing-cron] run finished`);
-  await pool.end();
+  const lockClient = await pool.connect();
+  let lockHeld = false;
+  try {
+    const lock = await lockClient.query("SELECT pg_try_advisory_lock(731954202) AS acquired");
+    lockHeld = Boolean(lock.rows[0]?.acquired);
+    if (!lockHeld) {
+      console.log("[billing-cron] another billing run is active; exiting without charging");
+      return;
+    }
+    await markTrialsExpiredWithoutPayment(lockClient);
+    await chargeDueRenewals(lockClient);
+    console.log(`[billing-cron] run finished`);
+  } finally {
+    if (lockHeld) await lockClient.query("SELECT pg_advisory_unlock(731954202)").catch(() => {});
+    lockClient.release();
+    await pool.end();
+  }
 }
 
 main().catch((err) => {

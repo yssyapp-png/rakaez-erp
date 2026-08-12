@@ -42,7 +42,7 @@ jobs:
         cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci
+      run: npm ci --ignore-scripts
 
     - name: Run linter
       run: npm run lint --if-present
@@ -77,10 +77,18 @@ jobs:
         cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci
+      run: npm ci --ignore-scripts
 
-    - name: Run npm audit
-      run: npm audit --audit-level=moderate
+    - name: Reject tracked secrets and environment files
+      if: matrix.project == 'backend'
+      working-directory: ${{ github.workspace }}
+      run: sh scripts/security-check.sh
+
+    - name: Audit production dependencies
+      run: npm audit --omit=dev --audit-level=moderate
+
+    - name: Audit the complete dependency tree
+      run: npm audit --audit-level=high
 
     - name: Check lockfile integrity
       run: npm ls --all
@@ -95,9 +103,10 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build backend production image
+    - name: Build full web production image
       uses: docker/build-push-action@v6
       with:
-        context: ./backend
+        context: .
+        file: ./backend/Dockerfile
         push: false
         tags: rakaez-erp:${{ github.sha }}

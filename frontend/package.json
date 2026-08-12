@@ -2,11 +2,18 @@
   "name": "rakaez-frontend",
   "version": "0.1.0",
   "type": "module",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=20.19 <23",
+    "npm": ">=10 <11"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "test": "node --test",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit:production": "npm audit --omit=dev --audit-level=moderate"
   },
   "dependencies": {
     "react": "^18.3.1",

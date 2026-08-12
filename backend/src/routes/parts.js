@@ -18,7 +18,10 @@ const IMPORT_BATCH_LIMIT = 1000;
 const IMPORT_MODES = new Set(["skip", "replace", "add"]);
 
 function cleanImportText(value, maxLength = 200) {
-  return String(value ?? "").trim().slice(0, maxLength);
+  return String(value ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, maxLength);
 }
 
 export function validateImportRows(rows, mode = "skip") {

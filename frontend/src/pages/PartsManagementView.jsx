@@ -237,7 +237,14 @@ function PartsImportPanel({ branches, onImported }) {
     setPreview(null);
     setError(null);
     try {
-      const parsed = parsePartsCsv(await file.text());
+      if (file.size > 2 * 1024 * 1024) throw new Error("حجم ملف CSV يجب ألا يتجاوز 2 ميجابايت");
+      if (!/\.csv$/i.test(file.name) && !["text/csv", "application/vnd.ms-excel"].includes(file.type)) {
+        throw new Error("الملف المسموح هو CSV فقط");
+      }
+      const text = await file.text();
+      if (text.includes("\u0000")) throw new Error("ملف CSV غير صالح");
+      const parsed = parsePartsCsv(text);
+      if (parsed.length > 1000) throw new Error("الحد الأقصى 1000 قطعة في كل دفعة");
       setRows(parsed);
     } catch (err) {
       setRows([]);

@@ -2,7 +2,7 @@ import { pool } from "../db/pool.js";
 import { requireRole } from "./auth.js";
 import { buildZatcaQrBase64 } from "../utils/zatca.js";
 import crypto from "crypto";
-import { fetchMoyasarPayment, isUuid, paymentMatches, refundableAmount, refundMoyasarPayment } from "../utils/moyasar.js";
+import { fetchMoyasarPayment, isUuid, paymentMatches, refundOutstandingMoyasarPayment } from "../utils/moyasar.js";
 import { deviceRequired } from "./devices.js";
 import { createSafeRouter } from "../utils/safe-router.js";
 
@@ -175,7 +175,19 @@ router.post("/checkout-online", requireRole("customer", "seller", "admin"), asyn
 
   const client = await pool.connect();
   let verifiedOwnedPayment = null;
+  let paymentLockHeld = false;
   try {
+    // Serializes retries for one Moyasar payment across all API instances.
+    // The lock is released in finally and never blocks unrelated payments.
+    const lockResult = await client.query(
+      "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
+      [`rakaez:online-payment:${paymentId}`]
+    );
+    if (!lockResult.rows[0]?.acquired) {
+      res.setHeader("Retry-After", "2");
+      return res.status(409).json({ error: "payment_processing_in_progress", retryable: true });
+    }
+    paymentLockHeld = true;
     if (!(await requireOwnedBranch(client, branchId, orgId))) {
       return res.status(404).json({ error: "branch_not_found" });
     }
@@ -223,9 +235,8 @@ router.post("/checkout-online", requireRole("customer", "seller", "admin"), asyn
     const expectedAmountHalalas = Math.round(total * 100);
     if (!paymentMatches(payment, expectedAmountHalalas, "SAR")) {
       const isSettled = ["paid", "captured"].includes(payment.status);
-      const refundAmount = refundableAmount(payment);
-      const refund = isSettled && refundAmount > 0
-        ? await refundMoyasarPayment(payment.id, refundAmount)
+      const refund = isSettled
+        ? await refundOutstandingMoyasarPayment(payment.id)
         : null;
       return res.status(402).json({
         error: "payment_verification_failed",
@@ -293,12 +304,12 @@ router.post("/checkout-online", requireRole("customer", "seller", "admin"), asyn
     } catch (fulfillmentErr) {
       await client.query("ROLLBACK").catch(() => {});
       console.error("Fulfillment failed after successful payment, refunding:", fulfillmentErr);
-      const existing = await pool.query(
+      const existing = await client.query(
         "SELECT * FROM invoices WHERE organization_id = $1 AND payment_reference = $2",
         [orgId, payment.id]
       );
       if (existing.rows[0]) return res.json({ ...existing.rows[0], idempotent: true });
-      const refund = await refundMoyasarPayment(payment.id, expectedAmountHalalas);
+      const refund = await refundOutstandingMoyasarPayment(payment.id);
       res.status(409).json({
         error: publicSalesError(fulfillmentErr, "fulfillment_failed"),
         refunded: refund.ok,
@@ -311,15 +322,12 @@ router.post("/checkout-online", requireRole("customer", "seller", "admin"), asyn
     console.error(err);
     if (verifiedOwnedPayment && ["paid", "captured"].includes(verifiedOwnedPayment.status)) {
       try {
-        const existing = await pool.query(
+        const existing = await client.query(
           "SELECT * FROM invoices WHERE organization_id = $1 AND customer_id = $2 AND payment_reference = $3",
           [orgId, req.user.id, verifiedOwnedPayment.id]
         );
         if (existing.rows[0]) return res.json({ ...existing.rows[0], idempotent: true });
-        const refundAmount = refundableAmount(verifiedOwnedPayment);
-        const refund = refundAmount > 0
-          ? await refundMoyasarPayment(verifiedOwnedPayment.id, refundAmount)
-          : { ok: false };
+        const refund = await refundOutstandingMoyasarPayment(verifiedOwnedPayment.id);
         return res.status(409).json({
           error: publicSalesError(err, "order_preparation_failed"),
           refunded: refund.ok,
@@ -338,6 +346,12 @@ router.post("/checkout-online", requireRole("customer", "seller", "admin"), asyn
     }
     res.status(400).json({ error: publicSalesError(err, "checkout_failed") });
   } finally {
+    if (paymentLockHeld) {
+      await client.query(
+        "SELECT pg_advisory_unlock(hashtextextended($1, 0))",
+        [`rakaez:online-payment:${paymentId}`]
+      ).catch(() => {});
+    }
     client.release();
   }
 });

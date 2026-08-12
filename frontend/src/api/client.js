@@ -1,7 +1,29 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
 
+// One-time migration from the old persistent browser session. The access
+// token remains available in this tab, then is removed from localStorage so
+// closing the browser ends the session instead of leaving a long-lived JWT.
+const legacyToken = localStorage.getItem("token");
+if (legacyToken && !sessionStorage.getItem("token")) sessionStorage.setItem("token", legacyToken);
+localStorage.removeItem("token");
+
+async function postPaymentWithRetry(url, body) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!(res.status === 409 && data.retryable && attempt === 0)) return data;
+    const retryAfterSeconds = Math.min(3, Math.max(1, Number(res.headers.get("Retry-After") || 1)));
+    await new Promise((resolve) => setTimeout(resolve, retryAfterSeconds * 1000));
+  }
+  return { error: "payment_processing_in_progress" };
+}
+
 function authHeaders() {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
   const deviceToken = localStorage.getItem("deviceToken");
   return {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -16,7 +38,7 @@ export async function login(email, password, organizationCode) {
     body: JSON.stringify({ email, password, organizationCode }),
   });
   const data = await res.json();
-  if (data.token) localStorage.setItem("token", data.token);
+  if (data.token) sessionStorage.setItem("token", data.token);
   return data;
 }
 
@@ -27,7 +49,7 @@ export async function register(payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (data.token) localStorage.setItem("token", data.token);
+  if (data.token) sessionStorage.setItem("token", data.token);
   return data;
 }
 
@@ -38,7 +60,7 @@ export async function acceptInvitation(token, name, password) {
     body: JSON.stringify({ token, name, password }),
   });
   const data = await res.json();
-  if (data.token) localStorage.setItem("token", data.token);
+  if (data.token) sessionStorage.setItem("token", data.token);
   return data;
 }
 
@@ -50,6 +72,7 @@ export async function getCurrentUser() {
 }
 
 export function logout() {
+  sessionStorage.removeItem("token");
   localStorage.removeItem("token");
   localStorage.removeItem("deviceToken");
   sessionStorage.removeItem("rakaez_pending_payment");
@@ -93,12 +116,7 @@ export async function checkout(branchId, items) {
 
 /** Customer checkout: the server verifies the hosted-form payment, then creates the invoice. */
 export async function checkoutOnline(branchId, items, paymentId, requestReference) {
-  const res = await fetch(`${BASE}/sales/checkout-online`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ branchId, items, paymentId, requestReference }),
-  });
-  return res.json();
+  return postPaymentWithRetry(`${BASE}/sales/checkout-online`, { branchId, items, paymentId, requestReference });
 }
 
 export async function getAdminStats() {
@@ -246,12 +264,11 @@ export async function getBillingStatus() {
  * activates recurring billing. `interval` is 'monthly' or 'yearly'.
  */
 export async function activateSubscription(paymentId, requestReference, interval = "monthly") {
-  const res = await fetch(`${BASE}/billing/activate-subscription`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ paymentId, requestReference, interval }),
+  return postPaymentWithRetry(`${BASE}/billing/activate-subscription`, {
+    paymentId,
+    requestReference,
+    interval,
   });
-  return res.json();
 }
 
 /** Switches an already-active subscription's billing cycle for the NEXT renewal (no proration). */

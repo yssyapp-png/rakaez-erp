@@ -55,6 +55,7 @@ test("inventory import validates, normalizes, and rejects duplicate rows", () =>
   assert.equal(result.errors[1].errors.includes("name_required"), true);
   assert.equal(result.errors[1].errors.includes("invalid_price"), true);
   assert.equal(validateImportRows([{ partNumber: "FREE", name: "قطعة", price: 0 }], "skip").errors[0].errors.includes("invalid_price"), true);
+  assert.equal(validateImportRows([{ partNumber: "SAFE", name: "فلتر\u0007زيت", price: 10 }], "skip").validRows[0].name, "فلترزيت");
 });
 
 test("inventory import enforces safe modes and batch limits", () => {
@@ -269,12 +270,34 @@ test("payment schema and routes enforce unique payment references and server ver
   assert.match(sales, /payment_ownership_mismatch/);
   assert.match(sales, /payment_reconciliation_required/);
   assert.match(sales, /verifiedOwnedPayment/);
+  assert.match(sales, /pg_try_advisory_lock/);
+  assert.match(sales, /payment_processing_in_progress/);
+  assert.match(sales, /refundOutstandingMoyasarPayment/);
+  assert.doesNotMatch(sales, /const existing = await pool\.query/);
   assert.match(sales, /leaving payment unchanged for manual review/);
   assert.match(billing, /fetchMoyasarPayment\(paymentId\)/);
+  assert.match(billing, /pg_try_advisory_lock/);
+  assert.match(billing, /refundOutstandingMoyasarPayment/);
+  assert.doesNotMatch(billing, /const existing = await pool\.query/);
   assert.match(billing, /subscription_payments/);
   assert.match(billing, /Subscription payment reconciliation failed/);
   assert.match(billing, /payment_reconciliation_required/);
   assert.match(renewals, /paymentMatches\(payment/);
+  assert.match(renewals, /refundOutstandingMoyasarPayment/);
   assert.match(renewals, /givenId/);
+  assert.match(renewals, /pg_try_advisory_lock\(731954202\)/);
   assert.match(renewals, /PAYMENTS_ENABLED !== "true"/);
+});
+
+test("production web delivery is restricted to compiled assets with CSP and request IDs", async () => {
+  const index = await fs.readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  const docker = await fs.readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(index, /contentSecurityPolicy/);
+  assert.match(index, /X-Request-ID/);
+  assert.match(index, /safe-path/);
+  assert.match(index, /Retry-After/);
+  assert.match(index, /dotfiles: "deny"/);
+  assert.match(index, /sendFile\(path\.join\(publicDirectory, "index\.html"\)/);
+  assert.match(docker, /FROM node:22-alpine AS web-dependencies/);
+  assert.match(docker, /COPY --from=web-build \/web\/dist \.\/public/);
 });

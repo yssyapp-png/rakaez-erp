@@ -1,7 +1,10 @@
 node_modules/
+.npm-cache/
 .env*
 !.env.example
 dist/
 build/
+coverage/
 .DS_Store
 *.log
+*.sarif

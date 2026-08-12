@@ -13,6 +13,10 @@
  * fail loudly instead of silently pretending to charge the customer.
  */
 const MOYASAR_API = "https://api.moyasar.com/v1";
+const configuredTimeout = Number(process.env.MOYASAR_TIMEOUT_MS || 15000);
+const MOYASAR_TIMEOUT_MS = Number.isFinite(configuredTimeout)
+  ? Math.min(30000, Math.max(3000, configuredTimeout))
+  : 15000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isUuid(value) {
@@ -46,44 +50,69 @@ export function refundableAmount(payment) {
   return Number.isInteger(remaining) && remaining > 0 ? remaining : 0;
 }
 
-export async function fetchMoyasarPayment(paymentId) {
+async function moyasarRequest(path, options = {}) {
   const secretKey = process.env.MOYASAR_SECRET_KEY;
   if (!secretKey) throw new Error("moyasar_not_configured");
+
+  const response = await fetch(`${MOYASAR_API}${path}`, {
+    ...options,
+    signal: AbortSignal.timeout(MOYASAR_TIMEOUT_MS),
+    headers: {
+      Accept: "application/json",
+      Authorization: authorizationHeader(secretKey),
+      ...options.headers,
+    },
+  });
+  const text = await response.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { message: "invalid_moyasar_response" };
+    }
+  }
+  return { response, data };
+}
+
+export async function fetchMoyasarPayment(paymentId) {
   if (!isUuid(paymentId)) {
     throw new Error("invalid_payment_reference");
   }
-  const res = await fetch(`${MOYASAR_API}/payments/${encodeURIComponent(paymentId)}`, {
-    headers: { Authorization: authorizationHeader(secretKey) },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.message || "payment_verification_failed");
+  const { response, data } = await moyasarRequest(`/payments/${encodeURIComponent(paymentId)}`);
+  if (!response.ok) throw new Error(data?.message || "payment_verification_failed");
   return data;
 }
 
-export async function createMoyasarPayment({ amountHalalas, source, description, currency = "SAR", givenId, metadata }) {
-  const secretKey = process.env.MOYASAR_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("moyasar_not_configured");
+export async function createMoyasarPayment({ amountHalalas, source, description, currency = "SAR", givenId, metadata, callbackUrl }) {
+  if (!isUuid(givenId)) throw new Error("invalid_payment_idempotency_key");
+  let callback;
+  try {
+    callback = new URL(callbackUrl);
+  } catch {
+    throw new Error("invalid_moyasar_callback_url");
+  }
+  if (process.env.NODE_ENV === "production" && callback.protocol !== "https:") {
+    throw new Error("moyasar_callback_https_required");
   }
 
-  const res = await fetch(`${MOYASAR_API}/payments`, {
+  const { response, data } = await moyasarRequest("/payments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: authorizationHeader(secretKey),
     },
     body: JSON.stringify({
       amount: amountHalalas, // Moyasar amounts are in halalas (SAR * 100)
-      ...(givenId ? { given_id: givenId } : {}),
+      given_id: givenId,
       ...(metadata ? { metadata } : {}),
       currency,
       description,
+      callback_url: callback.toString(),
       source, // { type: 'token', token: '<token from Moyasar.js, or a previously saved reusable token>' }
     }),
   });
 
-  const data = await res.json();
-  if (!res.ok) {
+  if (!response.ok) {
     const message = data?.message || "payment_failed";
     throw new Error(message);
   }
@@ -97,21 +126,20 @@ export async function createMoyasarPayment({ amountHalalas, source, description,
  * not be left charged for an order we can't actually fulfill.
  */
 export async function refundMoyasarPayment(paymentId, amountHalalas) {
-  const secretKey = process.env.MOYASAR_SECRET_KEY;
-  if (!secretKey) return { ok: false, error: "moyasar_not_configured" };
+  if (!isUuid(paymentId) || !Number.isInteger(Number(amountHalalas)) || Number(amountHalalas) <= 0) {
+    return { ok: false, error: "invalid_refund_request" };
+  }
 
   try {
-    const res = await fetch(`${MOYASAR_API}/payments/${encodeURIComponent(paymentId)}/refund`, {
+    const { response, data } = await moyasarRequest(`/payments/${encodeURIComponent(paymentId)}/refund`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authorizationHeader(secretKey),
       },
       body: JSON.stringify({ amount: amountHalalas }),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
+    if (!response.ok) {
       // Surface but don't throw — the caller is already in an error path and
       // needs to know refund failed too, without masking the original error.
       console.error("Moyasar refund failed:", data);
@@ -121,5 +149,24 @@ export async function refundMoyasarPayment(paymentId, amountHalalas) {
   } catch (error) {
     console.error("Moyasar refund request failed:", error);
     return { ok: false, error: error.message || "refund_request_failed" };
+  }
+}
+
+/**
+ * Re-fetches the provider state immediately before a compensating refund.
+ * A stale in-memory payment object must never be used to calculate a second
+ * refund after a timeout or retry.
+ */
+export async function refundOutstandingMoyasarPayment(paymentId) {
+  try {
+    const current = await fetchMoyasarPayment(paymentId);
+    const amount = refundableAmount(current);
+    if (amount === 0) {
+      return { ok: current?.status === "refunded" || Number(current?.refunded || 0) > 0, alreadySettled: true, data: current };
+    }
+    return refundMoyasarPayment(paymentId, amount);
+  } catch (error) {
+    console.error("Moyasar refund reconciliation failed:", error);
+    return { ok: false, error: error.message || "refund_reconciliation_failed" };
   }
 }

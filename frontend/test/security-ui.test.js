@@ -11,13 +11,28 @@ test("customer UI shows branch availability without internal shelf or exact stoc
 
 test("hosted payment form sends ownership metadata and uses a stable callback", async () => {
   const source = await fs.readFile(new URL("../src/components/MoyasarCheckout.jsx", import.meta.url), "utf8");
-  const html = await fs.readFile(new URL("../index.html", import.meta.url), "utf8");
+  const loader = await fs.readFile(new URL("../src/payments/loadMoyasar.js", import.meta.url), "utf8");
   assert.match(source, /on_initiating/);
-  assert.match(source, /metadata: paymentMetadata/);
+  assert.match(source, /initiating\.current/);
+  assert.match(source, /useEffect\(\(\) => \{/);
+  assert.match(source, /metadata: configuration\.paymentMetadata/);
+  assert.match(source, /amount: Math\.round\(configuration\.amountSar \* 100\)/);
+  assert.match(source, /description: configuration\.description/);
   assert.match(source, /window\.location\.origin/);
   assert.match(source, /credit_card: \{ save_card: true \}/);
   assert.match(source, /on_failure/);
-  assert.match(html, /moyasar-payment-form@2\.2\.10/);
+  assert.match(source, /supported_networks: \["mada", "visa", "mastercard"\]/);
+  assert.match(loader, /MOYASAR_FORM_VERSION = "2\.2\.10"/);
+  assert.match(loader, /moyasar_load_timeout/);
+});
+
+test("payment settlement retries only the server's explicit in-progress response", async () => {
+  const source = await fs.readFile(new URL("../src/api/client.js", import.meta.url), "utf8");
+  assert.match(source, /postPaymentWithRetry/);
+  assert.match(source, /res\.status === 409 && data\.retryable/);
+  assert.match(source, /Retry-After/);
+  assert.match(source, /checkout-online.*postPaymentWithRetry/s);
+  assert.match(source, /activateSubscription[\s\S]+postPaymentWithRetry\(`\$\{BASE\}\/billing\/activate-subscription/);
 });
 
 test("customer checkout prevents a single order from mixing branches", async () => {
@@ -63,8 +78,17 @@ test("logout clears user, device, and pending-payment state", async () => {
   const api = await fs.readFile(new URL("../src/api/client.js", import.meta.url), "utf8");
   const app = await fs.readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(api, /removeItem\("deviceToken"\)/);
+  assert.match(api, /sessionStorage\.removeItem\("token"\)/);
+  assert.match(api, /localStorage\.removeItem\("token"\)/);
   assert.match(api, /removeItem\("rakaez_pending_payment"\)/);
   assert.match(app, /removeItem\("rakaez_pending_payment"\)/);
+});
+
+test("CSV upload is bounded and rejects non-CSV and binary content", async () => {
+  const source = await fs.readFile(new URL("../src/pages/PartsManagementView.jsx", import.meta.url), "utf8");
+  assert.match(source, /2 \* 1024 \* 1024/);
+  assert.match(source, /parsed\.length > 1000/);
+  assert.match(source, /text\.includes\("\\u0000"\)/);
 });
 
 test("payment callers persist a request reference for 3DS return", async () => {
