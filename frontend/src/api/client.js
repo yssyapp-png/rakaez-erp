@@ -103,6 +103,24 @@ export async function createPart(payload) {
   return res.json();
 }
 
+export async function previewPartsImport(rows, mode) {
+  const res = await fetch(`${BASE}/parts/import/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ rows, mode }),
+  });
+  return res.json();
+}
+
+export async function commitPartsImport(rows, mode, branchId) {
+  const res = await fetch(`${BASE}/parts/import/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ rows, mode, branchId }),
+  });
+  return res.json();
+}
+
 export async function updatePart(id, payload) {
   const res = await fetch(`${BASE}/parts/${id}`, {
     method: "PUT",

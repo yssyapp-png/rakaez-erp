@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isNonNegativeInteger, isNonNegativeMoney } from "../src/routes/parts.js";
+import { isNonNegativeInteger, isNonNegativeMoney, validateImportRows } from "../src/routes/parts.js";
 import { hasValidItems } from "../src/routes/sales.js";
 import { subscriptionAllowsAccess } from "../src/routes/auth.js";
 import { SAUDI_STARTER_CATALOG } from "../src/routes/catalog.js";
@@ -31,6 +31,27 @@ test("inventory quantities are non-negative whole numbers", () => {
   assert.equal(isNonNegativeInteger("12"), true);
   assert.equal(isNonNegativeInteger(-1), false);
   assert.equal(isNonNegativeInteger(1.5), false);
+});
+
+test("inventory import validates, normalizes, and rejects duplicate rows", () => {
+  const result = validateImportRows([
+    { partNumber: " ab-10 ", name: "فلتر زيت", price: "25", quantity: "4" },
+    { partNumber: "AB-10", name: "مكرر", price: 30, quantity: 1 },
+    { partNumber: "BAD", name: "", price: -1, quantity: 1.5 },
+  ], "skip");
+  assert.equal(result.validRows.length, 1);
+  assert.equal(result.validRows[0].partNumber, "AB-10");
+  assert.equal(result.validRows[0].quantity, 4);
+  assert.equal(result.errors.length, 2);
+  assert.deepEqual(result.errors[0].errors, ["duplicate_in_file"]);
+  assert.equal(result.errors[1].errors.includes("name_required"), true);
+  assert.equal(result.errors[1].errors.includes("invalid_price"), true);
+});
+
+test("inventory import enforces safe modes and batch limits", () => {
+  assert.equal(validateImportRows([], "skip").error, "invalid_import_batch");
+  assert.equal(validateImportRows([{ partNumber: "P1", name: "قطعة", price: 1 }], "delete").error, "invalid_import_mode");
+  assert.equal(validateImportRows(Array.from({ length: 1001 }, (_, i) => ({ partNumber: `P${i}`, name: "قطعة", price: 1 })), "skip").error, "invalid_import_batch");
 });
 
 test("checkout accepts only non-empty lines with positive whole quantities", () => {

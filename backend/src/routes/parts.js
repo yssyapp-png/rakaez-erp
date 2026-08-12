@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { deviceRequired } from "./devices.js";
 import { normalizeVin } from "./vehicles.js";
+import { requireRole } from "./auth.js";
 
 const router = Router();
 
@@ -11,6 +12,57 @@ export function isNonNegativeMoney(value) {
 
 export function isNonNegativeInteger(value) {
   return Number.isInteger(Number(value)) && Number(value) >= 0;
+}
+
+const IMPORT_BATCH_LIMIT = 1000;
+const IMPORT_MODES = new Set(["skip", "replace", "add"]);
+
+function cleanImportText(value, maxLength = 200) {
+  return String(value ?? "").trim().slice(0, maxLength);
+}
+
+export function validateImportRows(rows, mode = "skip") {
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > IMPORT_BATCH_LIMIT) {
+    return { error: "invalid_import_batch", validRows: [], errors: [] };
+  }
+  if (!IMPORT_MODES.has(mode)) return { error: "invalid_import_mode", validRows: [], errors: [] };
+
+  const seen = new Set();
+  const validRows = [];
+  const errors = [];
+  rows.forEach((raw, index) => {
+    const rowNumber = index + 2;
+    const partNumber = cleanImportText(raw.partNumber, 100).toUpperCase();
+    const name = cleanImportText(raw.name);
+    const price = Number(raw.price);
+    const cost = raw.cost === "" || raw.cost == null ? 0 : Number(raw.cost);
+    const quantity = raw.quantity === "" || raw.quantity == null ? 0 : Number(raw.quantity);
+    const minQuantity = raw.minQuantity === "" || raw.minQuantity == null ? 5 : Number(raw.minQuantity);
+    const rowErrors = [];
+    if (!partNumber) rowErrors.push("part_number_required");
+    if (!name) rowErrors.push("name_required");
+    if (!isNonNegativeMoney(price)) rowErrors.push("invalid_price");
+    if (!isNonNegativeMoney(cost)) rowErrors.push("invalid_cost");
+    if (!isNonNegativeInteger(quantity)) rowErrors.push("invalid_quantity");
+    if (!isNonNegativeInteger(minQuantity)) rowErrors.push("invalid_min_quantity");
+    if (seen.has(partNumber)) rowErrors.push("duplicate_in_file");
+    if (partNumber) seen.add(partNumber);
+    if (rowErrors.length) {
+      errors.push({ rowNumber, partNumber, errors: rowErrors });
+      return;
+    }
+    validRows.push({
+      rowNumber, partNumber, name,
+      brand: cleanImportText(raw.brand, 120) || null,
+      category: cleanImportText(raw.category, 120) || null,
+      barcode: cleanImportText(raw.barcode, 120) || null,
+      price, cost, quantity, minQuantity,
+      shelfSection: cleanImportText(raw.shelfSection, 50) || null,
+      shelfNumber: cleanImportText(raw.shelfNumber, 50) || null,
+      shelfLevel: cleanImportText(raw.shelfLevel, 50) || null,
+    });
+  });
+  return { validRows, errors, mode };
 }
 
 async function branchBelongsToOrganization(client, branchId, organizationId) {
@@ -102,6 +154,95 @@ router.get("/", async (req, res) => {
     req.user.organizationId,
   ]);
   res.json(r.rows);
+});
+
+router.post("/import/preview", requireRole("admin"), async (req, res) => {
+  const validation = validateImportRows(req.body.rows, req.body.mode);
+  if (validation.error) return res.status(400).json({ error: validation.error });
+  const numbers = validation.validRows.map((row) => row.partNumber);
+  const existing = numbers.length
+    ? await pool.query(
+        "SELECT part_number FROM parts WHERE organization_id = $1 AND part_number = ANY($2::text[])",
+        [req.user.organizationId, numbers]
+      )
+    : { rows: [] };
+  const found = new Set(existing.rows.map((row) => row.part_number));
+  res.json({
+    total: req.body.rows.length,
+    valid: validation.validRows.length,
+    invalid: validation.errors.length,
+    existing: validation.validRows.filter((row) => found.has(row.partNumber)).length,
+    new: validation.validRows.filter((row) => !found.has(row.partNumber)).length,
+    errors: validation.errors.slice(0, 100),
+  });
+});
+
+router.post("/import/commit", requireRole("admin"), async (req, res) => {
+  const branchId = Number(req.body.branchId);
+  const validation = validateImportRows(req.body.rows, req.body.mode);
+  if (validation.error) return res.status(400).json({ error: validation.error });
+  if (validation.errors.length) {
+    return res.status(400).json({ error: "import_contains_invalid_rows", errors: validation.errors.slice(0, 100) });
+  }
+  if (!Number.isInteger(branchId)) return res.status(400).json({ error: "invalid_branch" });
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    if (!(await branchBelongsToOrganization(client, branchId, req.user.organizationId))) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "branch_not_found" });
+    }
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    for (const row of validation.validRows) {
+      const found = await client.query(
+        "SELECT id FROM parts WHERE organization_id = $1 AND part_number = $2 FOR UPDATE",
+        [req.user.organizationId, row.partNumber]
+      );
+      let partId = found.rows[0]?.id;
+      if (partId && validation.mode === "skip") {
+        skipped += 1;
+        continue;
+      }
+      if (!partId) {
+        const created = await client.query(
+          `INSERT INTO parts (organization_id, part_number, name, brand, category, barcode, price, cost)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          [req.user.organizationId, row.partNumber, row.name, row.brand, row.category, row.barcode, row.price, row.cost]
+        );
+        partId = created.rows[0].id;
+        inserted += 1;
+      } else {
+        await client.query(
+          `UPDATE parts SET name=$1, brand=$2, category=$3, barcode=$4, price=$5, cost=$6
+           WHERE id=$7 AND organization_id=$8`,
+          [row.name, row.brand, row.category, row.barcode, row.price, row.cost, partId, req.user.organizationId]
+        );
+        updated += 1;
+      }
+      const quantitySql = validation.mode === "add" ? "inventory.quantity + EXCLUDED.quantity" : "EXCLUDED.quantity";
+      await client.query(
+        `INSERT INTO inventory
+         (part_id, branch_id, quantity, min_quantity, shelf_section, shelf_number, shelf_level)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (part_id, branch_id) DO UPDATE SET
+           quantity = ${quantitySql}, min_quantity = EXCLUDED.min_quantity,
+           shelf_section = EXCLUDED.shelf_section, shelf_number = EXCLUDED.shelf_number,
+           shelf_level = EXCLUDED.shelf_level`,
+        [partId, branchId, row.quantity, row.minQuantity, row.shelfSection, row.shelfNumber, row.shelfLevel]
+      );
+    }
+    await client.query("COMMIT");
+    res.status(201).json({ ok: true, inserted, updated, skipped });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: "inventory_import_failed" });
+  } finally {
+    client.release();
+  }
 });
 
 /**
