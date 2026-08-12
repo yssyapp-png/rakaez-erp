@@ -87,3 +87,16 @@ test("tenant login requires an organization code and never selects the first mat
   assert.match(source, /upper\(o\.login_code\) = \$2/);
   assert.doesNotMatch(source, /ORDER BY id LIMIT 1/);
 });
+
+test("fresh schema creates users before the import audit foreign key", async () => {
+  const sql = await fs.readFile(new URL("../src/db/schema.sql", import.meta.url), "utf8");
+  assert.equal(sql.indexOf("CREATE TABLE users" ) < sql.indexOf("CREATE TABLE catalog_import_runs"), true);
+});
+
+test("CSV inventory import records an auditable run and inventory movements", async () => {
+  const source = await fs.readFile(new URL("../src/routes/parts.js", import.meta.url), "utf8");
+  assert.match(source, /INSERT INTO catalog_import_runs/);
+  assert.match(source, /'catalog_import'/);
+  assert.match(source, /updated_count=\$2/);
+  assert.match(source, /row\.quantity - previousQuantity/);
+});

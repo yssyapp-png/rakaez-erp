@@ -104,19 +104,6 @@ CREATE TABLE vehicle_applications (
   CHECK (year_from IS NULL OR year_to IS NULL OR year_from <= year_to)
 );
 
-CREATE TABLE catalog_import_runs (
-  id BIGSERIAL PRIMARY KEY,
-  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  source TEXT NOT NULL,
-  requested_by INTEGER NOT NULL REFERENCES users(id),
-  status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
-  inserted_count INTEGER NOT NULL DEFAULT 0,
-  skipped_count INTEGER NOT NULL DEFAULT 0,
-  error_message TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT now(),
-  completed_at TIMESTAMP
-);
-
 -- inventory: quantity of a part at a specific branch + shelf location
 CREATE TABLE inventory (
   id SERIAL PRIMARY KEY,
@@ -151,6 +138,22 @@ CREATE TABLE users (
   -- the same email could belong to different people at two different shops,
   -- but must be unique WITHIN a shop's own account list
   UNIQUE(organization_id, email)
+);
+
+CREATE TABLE catalog_import_runs (
+  id BIGSERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  requested_by INTEGER NOT NULL REFERENCES users(id),
+  branch_id INTEGER REFERENCES branches(id),
+  import_mode TEXT CHECK (import_mode IN ('skip','replace','add')),
+  status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
+  inserted_count INTEGER NOT NULL DEFAULT 0,
+  updated_count INTEGER NOT NULL DEFAULT 0,
+  skipped_count INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT now(),
+  completed_at TIMESTAMP
 );
 
 CREATE TABLE customer_vehicles (

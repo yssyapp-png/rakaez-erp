@@ -193,6 +193,13 @@ router.post("/import/commit", requireRole("admin"), async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "branch_not_found" });
     }
+    const runResult = await client.query(
+      `INSERT INTO catalog_import_runs
+       (organization_id, source, requested_by, branch_id, import_mode, status)
+       VALUES ($1,'shop-csv',$2,$3,$4,'running') RETURNING id`,
+      [req.user.organizationId, req.user.id, branchId, validation.mode]
+    );
+    const importRunId = runResult.rows[0].id;
     let inserted = 0;
     let updated = 0;
     let skipped = 0;
@@ -222,7 +229,13 @@ router.post("/import/commit", requireRole("admin"), async (req, res) => {
         );
         updated += 1;
       }
+      const inventoryBefore = await client.query(
+        "SELECT quantity FROM inventory WHERE part_id = $1 AND branch_id = $2 FOR UPDATE",
+        [partId, branchId]
+      );
+      const previousQuantity = Number(inventoryBefore.rows[0]?.quantity || 0);
       const quantitySql = validation.mode === "add" ? "inventory.quantity + EXCLUDED.quantity" : "EXCLUDED.quantity";
+      const quantityChange = validation.mode === "add" ? row.quantity : row.quantity - previousQuantity;
       await client.query(
         `INSERT INTO inventory
          (part_id, branch_id, quantity, min_quantity, shelf_section, shelf_number, shelf_level)
@@ -233,7 +246,20 @@ router.post("/import/commit", requireRole("admin"), async (req, res) => {
            shelf_level = EXCLUDED.shelf_level`,
         [partId, branchId, row.quantity, row.minQuantity, row.shelfSection, row.shelfNumber, row.shelfLevel]
       );
+      if (quantityChange !== 0) {
+        await client.query(
+          `INSERT INTO inventory_movements
+           (organization_id, branch_id, part_id, performed_by, movement_type, quantity_change, reference_type, reference_id, note)
+           VALUES ($1,$2,$3,$4,'receipt',$5,'catalog_import',$6,'استيراد مخزون CSV')`,
+          [req.user.organizationId, branchId, partId, req.user.id, quantityChange, String(importRunId)]
+        );
+      }
     }
+    await client.query(
+      `UPDATE catalog_import_runs SET status='completed', inserted_count=$1, updated_count=$2,
+       skipped_count=$3, completed_at=now() WHERE id=$4`,
+      [inserted, updated, skipped, importRunId]
+    );
     await client.query("COMMIT");
     res.status(201).json({ ok: true, inserted, updated, skipped });
   } catch (err) {
