@@ -6,6 +6,7 @@ import BillingView from "./pages/BillingView.jsx";
 import PartsManagementView from "./pages/PartsManagementView.jsx";
 import LoginView from "./pages/LoginView.jsx";
 import WarehouseView from "./pages/WarehouseView.jsx";
+import LandingPage from "./components/LandingPage.jsx";
 import { getCurrentUser, logout } from "./api/client.js";
 import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { useTheme } from "./theme/ThemeContext.jsx";
@@ -22,6 +23,7 @@ const TAB_DEFS = [
 
 export default function App() {
   const [tab, setTab] = useState("customer");
+  const [authMode, setAuthMode] = useState("login");
   const [user, setUser] = useState(null);
   const { t, lang, toggleLang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
@@ -56,55 +58,78 @@ export default function App() {
     setTab("customer");
   }
 
+  function openAuth(mode = "login") {
+    setAuthMode(mode);
+    setTab("login");
+    window.requestAnimationFrame(() => document.getElementById("access")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
   return (
-    <div className="rk-app">
-      <div className="rk-header">
-        <div className="rk-brand">
+    <div className={`rk-app${user ? " rk-app-authenticated" : " rk-app-public"}`}>
+      <header className="rk-header">
+        <button
+          type="button"
+          className="rk-brand rk-brand-button"
+          onClick={() => {
+            if (!user) {
+              setTab("customer");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          aria-label={!user ? t("back_home") : undefined}
+          disabled={Boolean(user)}
+        >
           <img className="rk-logo" src={logo} alt="ركائز" />
           <div>
             <h1>{t("appTitle")}</h1>
+            <p>{user ? t("workspace_subtitle") : t("brand_descriptor")}</p>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        </button>
+        {!user && <nav className="rk-public-nav" aria-label={t("main_navigation")}>
+          <a href="#capabilities">{t("nav_capabilities")}</a>
+          <button type="button" onClick={() => openAuth("new-shop")}>{t("nav_access")}</button>
+        </nav>}
+        <div className="rk-header-actions">
           <button
             className="rk-theme-toggle"
             onClick={toggleTheme}
-            title={theme === "light" ? "الوضع الداكن (بني غامق وذهبي)" : "الوضع الفاتح (بني فاتح وذهبي)"}
+            aria-label={theme === "light" ? t("dark_mode") : t("light_mode")}
+            title={theme === "light" ? t("dark_mode") : t("light_mode")}
           >
-            {theme === "light" ? "🌙" : "☀️"}
+            <span aria-hidden="true">{theme === "light" ? "◐" : "☼"}</span>
           </button>
           <button className="rk-theme-toggle" onClick={toggleLang} title={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}>
-            🌐 {t("lang_toggle")}
+            {t("lang_toggle")}
           </button>
           {user ? (
-            <div style={{ fontSize: 13, color: "var(--rakaez-text-on-header)" }}>
-              {t("welcome")} {user.name} ({user.role}) —{" "}
-              <a style={{ cursor: "pointer", color: "var(--rakaez-text-on-header)", textDecoration: "underline" }} onClick={onLogout}>
-                {t("logout")}
-              </a>
+            <div className="rk-user-menu">
+              <span className="rk-user-avatar">{String(user.name || "R").trim().charAt(0).toUpperCase()}</span>
+              <span><b>{user.name}</b><small>{t(`role_${user.role}`)}</small></span>
+              <button className="rk-header-link" onClick={onLogout}>{t("logout")}</button>
             </div>
           ) : (
-            <a
-              style={{ cursor: "pointer", color: "var(--rakaez-text-on-header)", fontSize: 13, fontWeight: 700 }}
-              onClick={() => setTab("login")}
-            >
+            <button className="rk-header-link" onClick={() => openAuth("login")}>
               {t("login")}
-            </a>
+            </button>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="rk-tabs">
+      {user && <nav className="rk-tabs" aria-label={t("workspace_navigation")}>
         {visibleTabs.map((tb) => (
           <button key={tb.key} className={`rk-tab${tab === tb.key ? " active" : ""}`} onClick={() => setTab(tb.key)}>
             {t(tb.labelKey)}
           </button>
         ))}
-      </div>
+      </nav>}
 
-      <div className="rk-fade-in">
-        {tab === "login" || !user ? (
+      <div className="rk-fade-in rk-content">
+        {!user && tab !== "login" ? (
+          <LandingPage onOpenLogin={() => openAuth("login")} onCreateShop={() => openAuth("new-shop")} />
+        ) : tab === "login" || !user ? (
+          <section id="access" className="rk-auth-section">
           <LoginView
+            initialMode={authMode}
             onLoggedIn={(u) => {
               setUser(u);
               setTab(
@@ -118,12 +143,18 @@ export default function App() {
               );
             }}
           />
+          </section>
         ) : tab === "customer" ? (
           <CustomerView user={user} />
         ) : (
           <Active user={user} />
         )}
       </div>
+      {!user && <footer className="rk-footer">
+        <div className="rk-brand rk-footer-brand"><img className="rk-logo" src={logo} alt="" /><div><strong>{t("brand_name")}</strong><span>{t("brand_descriptor")}</span></div></div>
+        <p>{t("footer_note")}</p>
+        <span>© {new Date().getFullYear()} Rakaez</span>
+      </footer>}
     </div>
   );
 }

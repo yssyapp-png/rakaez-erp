@@ -101,3 +101,28 @@ test("payment callers persist a request reference for 3DS return", async () => {
     assert.match(source, /payment\.status === "initiated"/);
   }
 });
+
+test("public web experience is bilingual, responsive, and connected to authentication", async () => {
+  const app = await fs.readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const landing = await fs.readFile(new URL("../src/components/LandingPage.jsx", import.meta.url), "utf8");
+  const i18n = await fs.readFile(new URL("../src/i18n/LanguageContext.jsx", import.meta.url), "utf8");
+  const theme = await fs.readFile(new URL("../src/theme.css", import.meta.url), "utf8");
+
+  assert.match(app, /LandingPage/);
+  assert.match(app, /onCreateShop=\{\(\) => openAuth\("new-shop"\)\}/);
+  assert.match(landing, /id="capabilities"/);
+  assert.match(landing, /landing_feature_vehicle_title/);
+  assert.match(i18n, /شغّل محل قطع الغيار من منصة واحدة/);
+  assert.match(i18n, /Run your auto-parts business from one platform/);
+  assert.match(i18n, /document\.documentElement\.dir/);
+  assert.match(theme, /@media \(max-width: 680px\)/);
+  assert.match(theme, /prefers-reduced-motion/);
+});
+
+test("web page publishes secure bilingual social metadata", async () => {
+  const html = await fs.readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /ركائز \| Rakaez/);
+  assert.match(html, /property="og:image" content="\/og\.png"/);
+  assert.match(html, /name="twitter:card" content="summary_large_image"/);
+});

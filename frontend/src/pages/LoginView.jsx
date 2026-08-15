@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { acceptInvitation, login, register } from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
-export default function LoginView({ onLoggedIn }) {
+export default function LoginView({ onLoggedIn, initialMode = "login" }) {
   const { t } = useLanguage();
   const inviteFromUrl = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("invite") || "";
-  const [mode, setMode] = useState(inviteFromUrl ? "invitation" : "login");
+  const [mode, setMode] = useState(inviteFromUrl ? "invitation" : initialMode);
   const [inviteToken, setInviteToken] = useState(inviteFromUrl);
   const [name, setName] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -14,6 +14,10 @@ export default function LoginView({ onLoggedIn }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!inviteFromUrl) setMode(initialMode);
+  }, [initialMode, inviteFromUrl]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -44,7 +48,7 @@ export default function LoginView({ onLoggedIn }) {
       if (mode === "invitation") window.history.replaceState({}, "", window.location.pathname);
       onLoggedIn(data.user);
     } catch {
-      setError("تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.");
+      setError(t("connection_error"));
     } finally {
       setLoading(false);
     }
@@ -57,13 +61,22 @@ export default function LoginView({ onLoggedIn }) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="rk-card rk-fade-in" style={{ maxWidth: 380, margin: "60px auto", display: "grid", gap: 12 }}>
-      <h2 style={{ textAlign: "center", color: "var(--rakaez-text)", margin: 0 }}>
-        {titles[mode]} — {t("brandSuffix")}
-      </h2>
+    <div className="rk-auth-layout">
+      <div className="rk-auth-intro">
+        <span className="rk-eyebrow"><i />{t("auth_kicker")}</span>
+        <h2>{t("auth_intro_title")}</h2>
+        <p>{t("auth_intro_body")}</p>
+        <ul><li>{t("auth_point_secure")}</li><li>{t("auth_point_tenant")}</li><li>{t("auth_point_audit")}</li></ul>
+      </div>
+    <form onSubmit={onSubmit} className="rk-card rk-auth-card rk-fade-in">
+      <div className="rk-auth-heading">
+        <span>{t("brandSuffix")}</span>
+        <h2>{titles[mode]}</h2>
+        <p>{mode === "login" ? t("login_welcome_back") : mode === "new-shop" ? t("new_shop_subtitle") : t("invitation_subtitle")}</p>
+      </div>
 
       {mode === "new-shop" && (
-        <div style={{ fontSize: 12, color: "#166534", background: "#f0fdf4", padding: 10, borderRadius: 6 }}>
+        <div className="rk-auth-notice">
           {t("trial_notice")}
         </div>
       )}
@@ -118,29 +131,30 @@ export default function LoginView({ onLoggedIn }) {
         required
       />
       {mode !== "login" && (
-        <div style={{ fontSize: 12, color: "#6b5a3f" }}>كلمة المرور: 12 حرفًا على الأقل وتحتوي على حرف ورقم.</div>
+        <div className="rk-field-hint">{t("password_hint")}</div>
       )}
-      {error && <div style={{ color: "#B3261E", fontSize: 13 }}>{error}</div>}
+      {error && <div className="rk-auth-error" role="alert">{error}</div>}
       <button disabled={loading} className="rk-btn">
         {loading ? t("submitting") : titles[mode]}
       </button>
 
-      <div style={{ fontSize: 13, textAlign: "center", display: "grid", gap: 6 }}>
+      <div className="rk-auth-links">
         {mode !== "login" && (
-          <a className="rk-link" onClick={() => setMode("login")}>
+          <button type="button" className="rk-link" onClick={() => setMode("login")}>
             {t("have_account")}
-          </a>
+          </button>
         )}
         {mode !== "new-shop" && (
-          <a className="rk-link" style={{ color: "#166534" }} onClick={() => setMode("new-shop")}>
+          <button type="button" className="rk-link rk-link-accent" onClick={() => setMode("new-shop")}>
             {t("shop_owner")}
-          </a>
+          </button>
         )}
         {mode !== "invitation" && (
-          <a className="rk-link" onClick={() => setMode("invitation")}>{t("have_invitation")}</a>
+          <button type="button" className="rk-link" onClick={() => setMode("invitation")}>{t("have_invitation")}</button>
         )}
       </div>
-      {mode === "login" && <div style={{ fontSize: 12, color: "#6b5a3f", textAlign: "center" }}>{t("organization_code_hint")}</div>}
+      {mode === "login" && <div className="rk-field-hint rk-field-hint-centered">{t("organization_code_hint")}</div>}
     </form>
+    </div>
   );
 }
