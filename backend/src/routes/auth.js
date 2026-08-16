@@ -4,7 +4,16 @@ import jwt from "jsonwebtoken";
 import { pool } from "../db/pool.js";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  // Security fix: never silently fall back to a hardcoded default secret —
+  // that would let anyone who reads the source code forge valid tokens.
+  // Fail loudly at startup instead, so a misconfigured deployment is caught
+  // immediately rather than running insecurely in production.
+  throw new Error(
+    "JWT_SECRET is missing or too short. Set a strong random value (32+ chars) in your .env file."
+  );
+}
 
 /**
  * POST /api/auth/register
@@ -28,6 +37,15 @@ router.post("/register", async (req, res) => {
   }
   if (role !== "admin" && !organizationId) {
     return res.status(400).json({ error: "missing_organization" });
+  }
+  // Security fix: creating an "admin" for an EXISTING organization must never
+  // be possible through public self-signup — that would let anyone become an
+  // admin of someone else's shop just by knowing/guessing its organizationId.
+  // Admins may only be created via the new-tenant bootstrap flow below
+  // (role="admin" with NO organizationId). Adding a second admin to an
+  // existing org must go through an authenticated invite flow, not this route.
+  if (role === "admin" && organizationId) {
+    return res.status(403).json({ error: "admin_signup_requires_new_organization" });
   }
 
   const client = await pool.connect();
@@ -111,12 +129,27 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password, organizationId } = req.body;
   try {
-    const query = organizationId
-      ? "SELECT * FROM users WHERE email = $1 AND organization_id = $2"
-      : "SELECT * FROM users WHERE email = $1 ORDER BY id LIMIT 1";
-    const params = organizationId ? [email, organizationId] : [email];
-    const result = await pool.query(query, params);
-    const user = result.rows[0];
+    let user;
+    if (organizationId) {
+      const result = await pool.query(
+        "SELECT * FROM users WHERE email = $1 AND organization_id = $2",
+        [email, organizationId]
+      );
+      user = result.rows[0];
+    } else {
+      // Security/correctness fix: an email can exist in multiple tenants.
+      // Silently picking the first match (ORDER BY id LIMIT 1) could log a
+      // user into the WRONG organization's account. If the email is
+      // ambiguous, ask the client to disambiguate instead of guessing.
+      const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+      if (result.rows.length > 1) {
+        return res.status(409).json({
+          error: "ambiguous_email",
+          organizations: result.rows.map((r) => r.organization_id),
+        });
+      }
+      user = result.rows[0];
+    }
     if (!user || !user.password_hash) {
       return res.status(401).json({ error: "invalid_credentials" });
     }
