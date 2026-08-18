@@ -14,8 +14,14 @@ function yearlyPriceFor(monthlyPriceSar) {
   return Number(monthlyPriceSar) * YEARLY_MONTHS_CHARGED;
 }
 
-/** GET /api/billing/status — trial/subscription state for the caller's shop */
-router.get("/status", async (req, res) => {
+/**
+ * GET /api/billing/status — trial/subscription state for the caller's shop.
+ * Security fix: this leaks the shop's platform billing relationship (plan
+ * price, trial status, whether a card is on file) — that's the shop owner's
+ * business with Rakaez, not something a regular customer account should be
+ * able to read. Restrict to admin, matching the other billing routes below.
+ */
+router.get("/status", requireRole("admin"), async (req, res) => {
   const r = await pool.query(
     `SELECT id, name, plan, plan_price_sar, trial_ends_at, subscription_status,
             (moyasar_card_token IS NOT NULL) AS has_payment_method, next_billing_at,

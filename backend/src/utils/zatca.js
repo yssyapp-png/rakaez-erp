@@ -17,6 +17,17 @@
  */
 function tlv(tag, value) {
   const valueBuf = Buffer.from(String(value), "utf8");
+  // Compliance fix: the length is encoded in a single byte (max 255) per the
+  // ZATCA TLV spec. Previously, a value longer than 255 bytes silently
+  // truncated here (JS keeps only the low 8 bits), producing a malformed,
+  // non-compliant QR code with no error — easy to hit with a longer Arabic
+  // business name, since Arabic characters take 2 bytes each in UTF-8.
+  // Fail loudly instead of emitting a broken invoice.
+  if (valueBuf.length > 255) {
+    throw new Error(
+      `zatca_tlv_value_too_long: tag ${tag} value is ${valueBuf.length} bytes, max 255 allowed by spec`
+    );
+  }
   return Buffer.concat([Buffer.from([tag, valueBuf.length]), valueBuf]);
 }
 

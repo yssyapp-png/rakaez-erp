@@ -82,9 +82,24 @@ router.post("/", async (req, res) => {
   if (!partNumber || !name || price == null) {
     return res.status(400).json({ error: "missing_fields" });
   }
+  if (price < 0 || (cost != null && cost < 0) || (quantity != null && quantity < 0) || (minQuantity != null && minQuantity < 0)) {
+    return res.status(400).json({ error: "negative_value_not_allowed" });
+  }
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    if (branchId) {
+      const branchCheck = await client.query(
+        "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+        [branchId, orgId]
+      );
+      if (!branchCheck.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "branch_not_found" });
+      }
+    }
+
     const partRes = await client.query(
       `INSERT INTO parts (organization_id, part_number, name, brand, category, price, cost)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
@@ -119,6 +134,9 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   if (!["admin", "seller"].includes(req.user.role)) return res.status(403).json({ error: "forbidden" });
   const { name, brand, category, price, cost } = req.body;
+  if ((price != null && price < 0) || (cost != null && cost < 0)) {
+    return res.status(400).json({ error: "negative_value_not_allowed" });
+  }
   const r = await pool.query(
     `UPDATE parts SET
        name = COALESCE($1, name),
@@ -153,13 +171,21 @@ router.put("/:id/inventory", async (req, res) => {
   if (!["admin", "seller"].includes(req.user.role)) return res.status(403).json({ error: "forbidden" });
   const { branchId, quantity, minQuantity, shelfSection, shelfNumber, shelfLevel } = req.body;
   if (!branchId) return res.status(400).json({ error: "missing_branchId" });
+  if ((quantity != null && quantity < 0) || (minQuantity != null && minQuantity < 0)) {
+    return res.status(400).json({ error: "negative_value_not_allowed" });
+  }
 
-  // ownership check: the branch must belong to this org
   const owns = await pool.query(
     `SELECT p.id FROM parts p WHERE p.id = $1 AND p.organization_id = $2`,
     [req.params.id, req.user.organizationId]
   );
   if (!owns.rows[0]) return res.status(404).json({ error: "not_found" });
+
+  const branchOwns = await pool.query(
+    "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+    [branchId, req.user.organizationId]
+  );
+  if (!branchOwns.rows[0]) return res.status(404).json({ error: "branch_not_found" });
 
   const r = await pool.query(
     `INSERT INTO inventory (part_id, branch_id, quantity, min_quantity, shelf_section, shelf_number, shelf_level)

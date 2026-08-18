@@ -44,6 +44,21 @@ router.post("/checkout", requireRole("seller", "admin"), async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // Security fix: the comment above always said branchId must never be
+    // trusted from the request body, but the code was doing exactly that
+    // (req.body.branchId took priority over req.user.branchId). Verify the
+    // branch actually belongs to this seller's organization before using it,
+    // rather than relying on inventory lookups happening to fail for a
+    // mismatched branch.
+    const branchCheck = await client.query(
+      "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+      [branchId, orgId]
+    );
+    if (!branchCheck.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "branch_not_found" });
+    }
+
     let subtotal = 0;
     const resolvedItems = [];
     for (const item of items) {
@@ -119,6 +134,17 @@ router.post("/checkout-online", async (req, res) => {
 
   const client = await pool.connect();
   try {
+    // Security fix: verify branchId belongs to the caller's organization
+    // before charging the customer's card or touching inventory — the same
+    // issue as in POST /checkout above.
+    const branchCheck = await client.query(
+      "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+      [branchId, orgId]
+    );
+    if (!branchCheck.rows.length) {
+      return res.status(404).json({ error: "branch_not_found" });
+    }
+
     // price everything first (read-only) so we know the exact amount to charge
     let subtotal = 0;
     const resolvedItems = [];
@@ -203,7 +229,10 @@ router.post("/checkout-online", async (req, res) => {
   }
 });
 
-router.get("/invoices", async (req, res) => {
+// Security fix: this previously had no role restriction, so an
+// authenticated "customer" could list every invoice for the whole
+// organization — not just their own purchases. Restrict to staff.
+router.get("/invoices", requireRole("seller", "admin"), async (req, res) => {
   const r = await pool.query(
     `SELECT i.*, b.name AS branch_name
      FROM invoices i JOIN branches b ON b.id = i.branch_id
