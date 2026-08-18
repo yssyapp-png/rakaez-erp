@@ -246,15 +246,21 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
 // Security fix: this previously had no role restriction, so an
 // authenticated "customer" could list every invoice for the whole
 // organization — not just their own purchases. Restrict to staff.
+// Reliability fix: the old hardcoded LIMIT 50 with no offset meant a shop
+// could only ever see its most recent 50 invoices through this endpoint —
+// there was no way to page further back. Add real pagination.
 router.get("/invoices", requireRole("seller", "admin"), async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 50));
+  const offset = (page - 1) * pageSize;
   const r = await pool.query(
     `SELECT i.*, b.name AS branch_name
      FROM invoices i JOIN branches b ON b.id = i.branch_id
      WHERE i.organization_id = $1
-     ORDER BY created_at DESC LIMIT 50`,
-    [req.user.organizationId]
+     ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    [req.user.organizationId, pageSize, offset]
   );
-  res.json(r.rows);
+  res.json({ items: r.rows, page, pageSize });
 });
 
 export default router;

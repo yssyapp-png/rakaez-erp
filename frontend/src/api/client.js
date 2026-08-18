@@ -36,7 +36,10 @@ export async function searchParts(q, type = "name") {
   const res = await fetch(`${BASE}/parts/search?q=${encodeURIComponent(q)}&type=${type}`, {
     headers: authHeaders(),
   });
-  return res.json();
+  const data = await res.json();
+  // Backend now returns { items, page, pageSize } for pagination — unwrap
+  // here so callers (CustomerView, SellerView) keep working unchanged.
+  return data.items ?? data;
 }
 
 export async function checkout(branchId, items) {
@@ -75,7 +78,8 @@ export async function getOrganization() {
 
 export async function getAllParts() {
   const res = await fetch(`${BASE}/parts`, { headers: authHeaders() });
-  return res.json();
+  const data = await res.json();
+  return data.items ?? data;
 }
 
 export async function createPart(payload) {
@@ -112,7 +116,8 @@ export async function updateInventory(partId, payload) {
 
 export async function getInvoices() {
   const res = await fetch(`${BASE}/sales/invoices`, { headers: authHeaders() });
-  return res.json();
+  const data = await res.json();
+  return data.items ?? data;
 }
 
 export async function getBillingStatus() {

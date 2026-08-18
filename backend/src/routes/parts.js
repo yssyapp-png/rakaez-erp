@@ -11,30 +11,43 @@ const router = Router();
  * standing between "each shop only sees its own catalog" and a serious data
  * leak across tenants, so it appears in every query below, not just once.
  */
+// Reliability fix: unbounded queries (no LIMIT) let a huge catalog return
+// thousands of rows in one response, slowing the app and wasting bandwidth.
+// Cap page size and require a page number, same pattern used below.
+function parsePagination(query) {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(query.pageSize, 10) || 20));
+  return { page, pageSize, offset: (page - 1) * pageSize };
+}
+
 router.get("/search", async (req, res) => {
   const { q = "", type = "name" } = req.query;
   const orgId = req.user.organizationId;
+  const { page, pageSize, offset } = parsePagination(req.query);
   try {
     let rows;
     if (type === "pn") {
       const r = await pool.query(
-        `SELECT * FROM parts WHERE organization_id = $1 AND part_number ILIKE $2`,
-        [orgId, `%${q}%`]
+        `SELECT * FROM parts WHERE organization_id = $1 AND part_number ILIKE $2
+         ORDER BY name LIMIT $3 OFFSET $4`,
+        [orgId, `%${q}%`, pageSize, offset]
       );
       rows = r.rows;
     } else if (type === "vin") {
       const r = await pool.query(
         `SELECT p.* FROM parts p
          JOIN vin_map v ON v.part_id = p.id
-         WHERE p.organization_id = $1 AND $2 ILIKE v.vin_pattern || '%'`,
-        [orgId, q]
+         WHERE p.organization_id = $1 AND $2 ILIKE v.vin_pattern || '%'
+         ORDER BY p.name LIMIT $3 OFFSET $4`,
+        [orgId, q, pageSize, offset]
       );
       rows = r.rows;
     } else {
       const r = await pool.query(
         `SELECT * FROM parts
-         WHERE organization_id = $1 AND (name ILIKE $2 OR brand ILIKE $2 OR category ILIKE $2)`,
-        [orgId, `%${q}%`]
+         WHERE organization_id = $1 AND (name ILIKE $2 OR brand ILIKE $2 OR category ILIKE $2)
+         ORDER BY name LIMIT $3 OFFSET $4`,
+        [orgId, `%${q}%`, pageSize, offset]
       );
       rows = r.rows;
     }
@@ -54,7 +67,7 @@ router.get("/search", async (req, res) => {
       })
     );
 
-    res.json(withInventory);
+    res.json({ items: withInventory, page, pageSize });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "search_failed" });
@@ -62,10 +75,12 @@ router.get("/search", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  const r = await pool.query("SELECT * FROM parts WHERE organization_id = $1 ORDER BY name", [
-    req.user.organizationId,
-  ]);
-  res.json(r.rows);
+  const { page, pageSize, offset } = parsePagination(req.query);
+  const r = await pool.query(
+    "SELECT * FROM parts WHERE organization_id = $1 ORDER BY name LIMIT $2 OFFSET $3",
+    [req.user.organizationId, pageSize, offset]
+  );
+  res.json({ items: r.rows, page, pageSize });
 });
 
 /**
