@@ -1,10 +1,24 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { pool } from "../db/pool.js";
 import { requireRole } from "./auth.js";
 import { buildZatcaQrBase64 } from "../utils/zatca.js";
 import { createMoyasarPayment, refundMoyasarPayment } from "../utils/moyasar.js";
 
 const router = Router();
+
+// Security fix: payment-initiating routes were only covered by the general
+// 300-req/15min /api limiter, which is far too loose for endpoints that
+// charge a card — that limit lets an attacker run hundreds of card-testing
+// attempts before being blocked. Apply a much tighter limit specifically
+// to checkout routes.
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "too_many_requests", message: "محاولات كثيرة جداً — يرجى المحاولة لاحقاً." },
+});
 
 async function getOrganization(client, orgId) {
   const r = await client.query("SELECT * FROM organizations WHERE id = $1", [orgId]);
@@ -32,7 +46,7 @@ async function findPartId(client, orgId, partNumber) {
  * user (req.user) — never trust these from the request body, or a seller
  * at one shop could invoice against another shop's branch/inventory.
  */
-router.post("/checkout", requireRole("seller", "admin"), async (req, res) => {
+router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (req, res) => {
   const { items } = req.body;
   const orgId = req.user.organizationId;
   const sellerId = req.user.id;
@@ -125,7 +139,7 @@ router.post("/checkout", requireRole("seller", "admin"), async (req, res) => {
  * account, scoped to the same organization as the branch they're buying
  * from, so an invoice can be attributed to someone within that shop's data.
  */
-router.post("/checkout-online", async (req, res) => {
+router.post("/checkout-online", paymentLimiter, async (req, res) => {
   const { branchId, items, moyasarToken } = req.body;
   const orgId = req.user.organizationId;
   if (!items?.length) return res.status(400).json({ error: "empty_cart" });

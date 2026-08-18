@@ -1,9 +1,20 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { pool } from "../db/pool.js";
 import { requireRole } from "./auth.js";
 import { createMoyasarPayment } from "../utils/moyasar.js";
 
 const router = Router();
+
+// Security fix: same reasoning as sales.js — this charges a card, so it
+// needs a much tighter limit than the general /api rate limit.
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "too_many_requests", message: "محاولات كثيرة جداً — يرجى المحاولة لاحقاً." },
+});
 
 // Yearly = 10x the monthly price instead of 12x — a ~17% discount for
 // committing upfront, and simple enough to explain to a shop owner without
@@ -49,7 +60,7 @@ router.get("/status", requireRole("admin"), async (req, res) => {
  * trial to lock in billing before the trial ends, and can choose monthly or
  * yearly billing at that point.
  */
-router.post("/activate-subscription", requireRole("admin"), async (req, res) => {
+router.post("/activate-subscription", paymentLimiter, requireRole("admin"), async (req, res) => {
   const { moyasarToken, interval } = req.body;
   if (!moyasarToken) return res.status(400).json({ error: "missing_payment_token" });
   const billingInterval = interval === "yearly" ? "yearly" : "monthly";
