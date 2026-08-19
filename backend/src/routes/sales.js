@@ -40,6 +40,24 @@ async function findPartId(client, orgId, partNumber) {
 }
 
 /**
+ * Security fix: neither checkout route validated that item.quantity was a
+ * positive integer. A negative quantity would DECREASE the computed
+ * subtotal (reducing what the customer pays) while simultaneously making
+ * `inventory.quantity - quantity` INCREASE stock, and the guard clause
+ * `quantity >= $1` becomes trivially true for negative $1 — so it silently
+ * let a cart mix negative and positive line items to both underpay and
+ * inflate the shop's own inventory. Reject anything that isn't a positive
+ * integer before any pricing or stock math happens.
+ */
+function validateItemQuantities(items) {
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error(`invalid_quantity:${item.partId}`);
+    }
+  }
+}
+
+/**
  * POST /api/sales/checkout
  * body: { items: [{ partId (= part_number), quantity }] }
  * branchId, sellerId, and organizationId all come from the authenticated
@@ -53,6 +71,11 @@ router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (
   const branchId = req.body.branchId || req.user.branchId;
   if (!branchId) return res.status(400).json({ error: "missing_branch" });
   if (!items?.length) return res.status(400).json({ error: "empty_cart" });
+  try {
+    validateItemQuantities(items);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
   const client = await pool.connect();
   try {
@@ -145,6 +168,11 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
   if (!items?.length) return res.status(400).json({ error: "empty_cart" });
   if (!branchId) return res.status(400).json({ error: "missing_branch" });
   if (!moyasarToken) return res.status(400).json({ error: "missing_payment_token" });
+  try {
+    validateItemQuantities(items);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
   const client = await pool.connect();
   try {
@@ -226,7 +254,17 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
     } catch (fulfillmentErr) {
       await client.query("ROLLBACK").catch(() => {});
       console.error("Fulfillment failed after successful payment, refunding:", fulfillmentErr);
-      const refund = await refundMoyasarPayment(payment.id, Math.round(total * 100));
+      // Reliability fix: refundMoyasarPayment can itself throw (network
+      // error, Moyasar outage) instead of returning {ok:false}. Catch that
+      // case too so the customer still gets the "contact support with this
+      // payment reference" message instead of a bare 500 with no reference.
+      let refund;
+      try {
+        refund = await refundMoyasarPayment(payment.id, Math.round(total * 100));
+      } catch (refundErr) {
+        console.error("RECONCILE NEEDED: auto-refund threw for payment", payment.id, refundErr);
+        refund = { ok: false };
+      }
       res.status(409).json({
         error: fulfillmentErr.message || "fulfillment_failed",
         refunded: refund.ok,
