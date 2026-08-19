@@ -157,10 +157,11 @@ router.post("/login", async (req, res) => {
       // ambiguous, ask the client to disambiguate instead of guessing.
       const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
       if (result.rows.length > 1) {
-        return res.status(409).json({
-          error: "ambiguous_email",
-          organizations: result.rows.map((r) => r.organization_id),
-        });
+        // Security fix: don't reveal which organizations share this email
+        // before the password has even been checked — that lets an attacker
+        // enumerate a person's employer/shop affiliations for free. Ask the
+        // client to resend with organizationId, without listing the options.
+        return res.status(409).json({ error: "ambiguous_email_specify_organization" });
       }
       user = result.rows[0];
     }
