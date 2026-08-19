@@ -67,6 +67,7 @@ router.post("/activate-subscription", paymentLimiter, requireRole("admin"), asyn
 
   const orgId = req.user.organizationId;
   const client = await pool.connect();
+  let payment = null;
   try {
     const orgRes = await client.query("SELECT * FROM organizations WHERE id = $1", [orgId]);
     const org = orgRes.rows[0];
@@ -75,7 +76,7 @@ router.post("/activate-subscription", paymentLimiter, requireRole("admin"), asyn
     const amountSar =
       billingInterval === "yearly" ? yearlyPriceFor(org.plan_price_sar) : Number(org.plan_price_sar);
 
-    const payment = await createMoyasarPayment({
+    payment = await createMoyasarPayment({
       amountHalalas: Math.round(amountSar * 100),
       source: { type: "token", token: moyasarToken },
       description: `اشتراك ركائز - ${org.name} - ${billingInterval === "yearly" ? "سنوي" : "شهري"} - أول دورة فوترة`,
@@ -97,6 +98,13 @@ router.post("/activate-subscription", paymentLimiter, requireRole("admin"), asyn
       });
     }
 
+    // Reliability fix: the charge (via Moyasar) and the local DB update are
+    // two separate systems that can't be rolled back together — if the
+    // UPDATE below throws after the card was already charged, the customer
+    // paid but their subscription never activates locally. Wrap the DB side
+    // in an explicit transaction, and if it still fails, log the payment id
+    // loudly so it can be reconciled manually instead of silently lost.
+    await client.query("BEGIN");
     const intervalSql = billingInterval === "yearly" ? "interval '1 year'" : "interval '1 month'";
     await client.query(
       `UPDATE organizations
@@ -105,6 +113,7 @@ router.post("/activate-subscription", paymentLimiter, requireRole("admin"), asyn
        WHERE id = $3`,
       [reusableToken, billingInterval, orgId]
     );
+    await client.query("COMMIT");
 
     res.json({
       ok: true,
@@ -114,6 +123,15 @@ router.post("/activate-subscription", paymentLimiter, requireRole("admin"), asyn
           : "تم تفعيل الاشتراك الشهري — سيتم التجديد تلقائياً كل شهر بدون أي إجراء منك.",
     });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (payment && payment.status === "paid") {
+      // The customer WAS charged but we couldn't record it — this needs a
+      // human to reconcile, not just a generic error response.
+      console.error(
+        `RECONCILE NEEDED: payment ${payment.id} succeeded for org ${orgId} but activation failed to save`,
+        err
+      );
+    }
     console.error(err);
     res.status(400).json({ error: err.message || "activation_failed" });
   } finally {
