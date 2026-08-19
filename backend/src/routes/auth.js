@@ -89,6 +89,20 @@ router.post("/register", async (req, res) => {
       return res.status(409).json({ error: "email_taken" });
     }
 
+    // Security fix: a caller-supplied branchId must belong to the same
+    // organization they're joining — otherwise anyone could attach their
+    // new account to a branch belonging to a different tenant.
+    if (branchId) {
+      const branchCheck = await client.query(
+        "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+        [branchId, orgId]
+      );
+      if (!branchCheck.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "branch_not_found" });
+      }
+    }
+
     const hash = await bcrypt.hash(password, 10);
     const finalBranchId = branchId || req._defaultBranchId || null;
     const result = await client.query(
