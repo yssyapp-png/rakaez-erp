@@ -1,12 +1,12 @@
 #!/bin/sh
 set -eu
 
-# Uses an isolated cache for Rakaez. It deliberately does not run
+# Uses an isolated cache inside the ignored project workspace. It deliberately does not run
 # `npm cache clean`, delete node_modules by hand, or modify the user's global
 # npm cache. npm's own documentation recommends verification because the
 # cache is self-healing and a clean is normally unnecessary.
 repository_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-cache_root="${TMPDIR:-/tmp}/rakaez-npm-cache"
+cache_root="$repository_dir/.npm-cache"
 
 node_major=$(node -p "Number(process.versions.node.split('.')[0])")
 if [ "$node_major" -ne 24 ]; then
@@ -21,7 +21,7 @@ for project in backend frontend; do
   echo "Installing $project dependencies from the lockfile..."
   (
     cd "$repository_dir/$project"
-    npm ci --ignore-scripts --prefer-online --cache "$cache_root" --no-fund
+    npm ci --ignore-scripts --prefer-offline --cache "$cache_root" --no-audit --no-fund
   )
 done
 

@@ -1,5 +1,9 @@
 # Rakaez ERP — ركائز لقطع غيار السيارات
 
+> **الأولوية المعتمدة:** إعداد المشروع واختباره وتأمينه أولًا، وتأجيل إجراءات ZATCA
+> والربط الفعلي إلى مرحلة لاحقة. راجع [أولويات مشروع ركائز](PROJECT_PRIORITIES_AR.md)
+> قبل بدء أي نشر أو دفع أو تكامل حكومي.
+
 > راجع [تقرير الجاهزية قبل الإطلاق](PRE_LAUNCH_READINESS_AR.md) قبل أي نشر أو تفعيل للدفع. القرار الحالي يسمح بتجربة ويب مغلقة بشروط، وليس إطلاقًا عامًا مدفوعًا.
 
 > راجع كذلك [خط الأساس السعودي للأمن السيبراني](SAUDI_CYBERSECURITY_BASELINE_AR.md)
@@ -8,7 +12,7 @@
 
 نظام SaaS متعدد المستأجرين (Multi-Tenant) لمحلات قطع غيار السيارات في السعودية: كل محل (Organization) له بياناته ومخزونه وفروعه معزولة تمامًا عن بقية المحلات، مع نقاط بيع (POS)، فوترة ضريبية متوافقة مع ZATCA (المرحلة الأولى)، دفع إلكتروني عبر Moyasar، واشتراكات دورية تلقائية.
 
-> **تطبيق الموبايل** (عملاء + بائعون) مشروع منفصل: [rakaez-parts-mobile](https://github.com/yssyapp/rakaez-parts-mobile).
+> **تطبيق الموبايل** (عملاء + بائعون) مشروع منفصل: [rakaez-parts-mobile](https://github.com/yssyapp-png/rakaez-parts-mobile).
 
 ## البنية
 
@@ -29,11 +33,35 @@ rakaez-erp/
 - **عزل بيانات صارم بين المحلات**: كل استعلام بقاعدة البيانات مقيّد بـ `organization_id` المأخوذ من رمز الدخول (JWT) نفسه، وليس من الطلب — لا يمكن لمحل الوصول لبيانات محل آخر.
 - **نقاط بيع (POS)**: إنقاص المخزون فوريًا عند البيع داخل معاملة قاعدة بيانات واحدة (`BEGIN/COMMIT/ROLLBACK`) تمنع بيع كمية أكبر من المتوفر فعليًا، حتى تحت ضغط طلبات متزامنة.
 - **بحث القطع** بالاسم / رقم القطعة / رقم الهيكل (VIN)، مع موقع الرف لكل قطعة بكل فرع.
+- **مصادر كتالوج مرخصة مخططة**: اعتماد 7zap/Levam لبيانات VIN وOEM وPartSouq للأسعار والتوفر، مع تعطيل الاتصال افتراضيًا حتى اكتمال العقود والمفاتيح والاختبار الأمني. راجع `CATALOG_PROVIDERS_AR.md`.
 - **فوترة ضريبية**: توليد QR متوافق مع المرحلة الأولى من ZATCA لكل فاتورة بيع (`utils/zatca.js`).
 - **دفع إلكتروني واشتراكات**: تكامل مع Moyasar لتحصيل الدفعات، وحفظ رمز بطاقة قابل لإعادة الاستخدام لتفعيل التجديد التلقائي الشهري (`scripts/billing-cron.js`).
 - **أمان الخادم**: تسجيل دخول بـ JWT + كلمات مرور مشفّرة بـ bcrypt، `helmet` لسياسات أمان الترويسات، `express-rate-limit` للحد من هجمات التخمين، `morgan` لتسجيل الطلبات، واستعلامات SQL معامَلة بالكامل (Parameterized Queries) لمنع حقن SQL بنيويًا.
 
 ## التشغيل محليًا
+
+المسار الصحيح للمشروع على الماك هو جذر مستودع `rakaez-erp`. بعد فتحه يمكن تنفيذ
+الفحوص والبناء من مكان واحد على Node.js 24:
+
+```bash
+cd "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp"
+npm run setup
+npm run check
+```
+
+يستخدم `npm run setup` مخزنًا معزولًا داخل المشروع (`.npm-cache`) ولا يلمس
+ذاكرة npm العامة في الماك، لأن الذاكرة العامة القديمة قد تحتوي ملفات بملكية
+غير صحيحة. هذا المجلد مستثنى من Git ولا يُرفع إلى GitHub.
+
+أوامر التطوير من الجذر:
+
+```bash
+npm run dev:backend
+npm run dev:frontend
+```
+
+المشروع موحّد على Node.js 24 في الماك وGitHub Actions وحاوية الإنتاج. يجب
+متابعة تحديثاته الأمنية وتثبيت أحدث إصدار تصحيحي من السلسلة 24 باستمرار.
 
 ### 1) قاعدة البيانات
 ```bash
@@ -44,13 +72,26 @@ psql rakaez < backend/src/db/seed.sql
 
 ### 2) الباك اند
 ```bash
-cd backend
+cd "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp/backend"
 cp .env.example .env   # عدّل القيم: DATABASE_URL, JWT_SECRET, مفاتيح Moyasar
 npm install
 npm run dev             # http://localhost:4000
 ```
 
 القيم المطلوبة في `.env` (راجع `.env.example` بمجلد backend، وليس الملف بجذر المشروع — انظر ملاحظة أدناه):
+
+للربط المحلي الآمن بمشروع Supabase الخاص بركائز، شغّل من جذر المشروع:
+
+```bash
+npm run configure:supabase
+```
+
+سيطلب الأمر كلمة مرور قاعدة البيانات داخل الطرفية بإدخال مخفي، ثم ينشئ
+`backend/.env` بصلاحيات مقيدة. لا ترسل كلمة المرور في المحادثة ولا تضعها في Git.
+يستخدم الإعداد المحلي اتصال Supabase المباشر الآمن، وهو الأنسب لخادم تطوير
+طويل التشغيل على جهاز الماك؛ يحدد نوع Pooler المناسب لاحقًا وفق منصة الاستضافة.
+يتصل تطبيق الجوال بخادم ركائز عبر `RAKAEZ_API_URL` ولا يحمل كلمة مرور Supabase
+أو رابط قاعدة البيانات داخله.
 
 | المتغير | الوصف |
 |---|---|
@@ -62,7 +103,7 @@ npm run dev             # http://localhost:4000
 
 ### 3) الفرونت اند
 ```bash
-cd frontend
+cd "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp/frontend"
 npm install
 npm run dev              # http://localhost:5173
 ```
@@ -71,7 +112,7 @@ npm run dev              # http://localhost:5173
 
 1. إضافة صلاحيات مفصّلة أكثر (عميل / بائع / مدير) حسب نمو الحاجة.
 2. تفعيل تكامل ZATCA الكامل (المرحلة الثانية: توقيع رقمي وتصريح إلكتروني عبر Fatoora) — الموجود حاليًا هو QR المرحلة الأولى فقط.
-3. بناء تطبيقات iOS/Android عبر مشروع [rakaez-parts-mobile](https://github.com/yssyapp/rakaez-parts-mobile) لتستهلك نفس الـ API.
+3. بناء تطبيقات iOS/Android عبر مشروع [rakaez-parts-mobile](https://github.com/yssyapp-png/rakaez-parts-mobile) لتستهلك نفس الـ API.
 4. نشر صورة الإنتاج الموحدة من جذر المستودع؛ تبني الواجهة وتخدم الملفات المجمعة فقط مع API على النطاق نفسه.
 
 ---

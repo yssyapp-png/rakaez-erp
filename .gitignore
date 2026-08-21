@@ -8,3 +8,10 @@ coverage/
 .DS_Store
 *.log
 *.sarif
+
+# Local demo outputs and bundled media tools (keep source files versioned)
+demo-preview/tools/
+demo-preview/*.mp4
+demo-preview/*.aiff
+demo-preview/voice-*-segments/
+demo-preview/.*-generation-status

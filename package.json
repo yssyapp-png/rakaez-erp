@@ -1,0 +1,22 @@
+{
+  "name": "rakaez-erp",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=10 <12"
+  },
+  "scripts": {
+    "setup": "sh scripts/repair-npm-cache.sh",
+    "configure:supabase": "sh scripts/configure-supabase-local.sh",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "test:backend": "npm --prefix backend test",
+    "test:frontend": "npm --prefix frontend test",
+    "test": "npm run test:backend && npm run test:frontend",
+    "build": "npm --prefix frontend run build",
+    "security:check": "sh scripts/security-check.sh",
+    "check": "npm test && npm run build && npm run security:check"
+  }
+}

@@ -12,7 +12,10 @@
  * Requires MOYASAR_SECRET_KEY in the environment. Without it, checkout will
  * fail loudly instead of silently pretending to charge the customer.
  */
-const MOYASAR_API = "https://api.moyasar.com/v1";
+import { secureOutboundFetch } from "./outbound-policy.js";
+
+const MOYASAR_ORIGIN = "https://api.moyasar.com";
+const MOYASAR_API = `${MOYASAR_ORIGIN}/v1`;
 const configuredTimeout = Number(process.env.MOYASAR_TIMEOUT_MS || 15000);
 const MOYASAR_TIMEOUT_MS = Number.isFinite(configuredTimeout)
   ? Math.min(30000, Math.max(3000, configuredTimeout))
@@ -54,9 +57,10 @@ async function moyasarRequest(path, options = {}) {
   const secretKey = process.env.MOYASAR_SECRET_KEY;
   if (!secretKey) throw new Error("moyasar_not_configured");
 
-  const response = await fetch(`${MOYASAR_API}${path}`, {
+  const response = await secureOutboundFetch(`${MOYASAR_API}${path}`, {
+    allowedOrigins: [MOYASAR_ORIGIN],
+    timeoutMs: MOYASAR_TIMEOUT_MS,
     ...options,
-    signal: AbortSignal.timeout(MOYASAR_TIMEOUT_MS),
     headers: {
       Accept: "application/json",
       Authorization: authorizationHeader(secretKey),
@@ -142,12 +146,12 @@ export async function refundMoyasarPayment(paymentId, amountHalalas) {
     if (!response.ok) {
       // Surface but don't throw — the caller is already in an error path and
       // needs to know refund failed too, without masking the original error.
-      console.error("Moyasar refund failed:", data);
+      console.error("Moyasar refund failed", { status: response.status });
       return { ok: false, data };
     }
     return { ok: true, data };
   } catch (error) {
-    console.error("Moyasar refund request failed:", error);
+    console.error("Moyasar refund request failed", { message: String(error?.message || "refund_request_failed").slice(0, 120) });
     return { ok: false, error: error.message || "refund_request_failed" };
   }
 }
@@ -166,7 +170,7 @@ export async function refundOutstandingMoyasarPayment(paymentId) {
     }
     return refundMoyasarPayment(paymentId, amount);
   } catch (error) {
-    console.error("Moyasar refund reconciliation failed:", error);
+    console.error("Moyasar refund reconciliation failed", { message: String(error?.message || "refund_reconciliation_failed").slice(0, 120) });
     return { ok: false, error: error.message || "refund_reconciliation_failed" };
   }
 }

@@ -14,15 +14,24 @@ import billingRouter from "./routes/billing.js";
 import devicesRouter from "./routes/devices.js";
 import catalogRouter from "./routes/catalog.js";
 import vehiclesRouter from "./routes/vehicles.js";
+import procurementRouter from "./routes/procurement.js";
+import transfersRouter from "./routes/transfers.js";
+import complianceRouter from "./routes/compliance.js";
 import { pool } from "./db/pool.js";
 import authRouter, { authRequired, requireActiveSubscription, requireRole } from "./routes/auth.js";
+import { securityHash } from "./utils/security.js";
+import { crossSiteRequestGuard, parseAllowedOrigins } from "./utils/http-security.js";
+import { validateZatcaRuntimeConfiguration } from "./utils/zatca-integration.js";
+import { validateCatalogProviderConfiguration } from "./utils/catalog-providers.js";
 
 dotenv.config();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
+validateZatcaRuntimeConfiguration();
+validateCatalogProviderConfiguration();
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
 if (process.env.NODE_ENV === "production") {
-  if (!process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ALLOWED_ORIGINS.includes("localhost")) {
-    throw new Error("Production CORS_ALLOWED_ORIGINS must contain the deployed web origin");
-  }
+  if (process.env.DB_SSL !== "true") throw new Error("Production DB_SSL must be true");
+  if (process.env.ENFORCE_HTTPS !== "true") throw new Error("Production ENFORCE_HTTPS must be true");
   if (process.env.PAYMENTS_ENABLED === "true" && !process.env.MOYASAR_SECRET_KEY) {
     throw new Error("MOYASAR_SECRET_KEY is required when payments are enabled");
   }
@@ -45,6 +54,9 @@ app.use((req, res, next) => {
   req.requestId = /^[A-Za-z0-9_-]{8,80}$/.test(supplied) ? supplied : crypto.randomUUID();
   res.setHeader("X-Request-ID", req.requestId);
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self)");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
   next();
 });
 
@@ -54,6 +66,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
       scriptSrc: ["'self'", "https://cdn.jsdelivr.net/npm/moyasar-payment-form@2.2.10/dist/"],
       scriptSrcAttr: ["'none'"],
@@ -67,15 +80,17 @@ app.use(helmet({
     },
   },
 }));
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:5173")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
 app.use(cors({
   origin: allowedOrigins,
-  credentials: false,
+  credentials: true,
   exposedHeaders: ["X-Request-ID", "Retry-After"],
 }));
+app.use(crossSiteRequestGuard(allowedOrigins));
 app.use((req, res, next) => {
   if (
     process.env.NODE_ENV === "production" &&
@@ -92,7 +107,8 @@ app.use(express.json({ limit: "2mb" }));
 // can't just watch the terminal live.
 morgan.token("request-id", (req) => req.requestId);
 morgan.token("safe-path", (req) => req.path);
-app.use(morgan(process.env.NODE_ENV === "production" ? ':remote-addr - :request-id ":method :safe-path HTTP/:http-version" :status :res[content-length] - :response-time ms' : "dev"));
+morgan.token("client-fingerprint", (req) => securityHash(req.ip || req.socket?.remoteAddress || "unknown").slice(0, 16));
+app.use(morgan(process.env.NODE_ENV === "production" ? ':client-fingerprint - :request-id ":method :safe-path HTTP/:http-version" :status :res[content-length] - :response-time ms' : "dev"));
 
 // Rate limiting on /api — a shared limit is fine at this stage; per-tenant
 // limits are a future refinement once real traffic patterns are known.
@@ -102,8 +118,79 @@ app.use(
   rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false })
 );
 app.use(
-  "/api/auth",
-  rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false })
+  "/api/auth/login",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "auth_rate_limited" },
+  })
+);
+app.use(
+  "/api/auth/register",
+  rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "registration_rate_limited" },
+  })
+);
+app.use(
+  "/api/auth/accept-invitation",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "invitation_rate_limited" },
+  })
+);
+app.use(
+  "/api/auth/password",
+  rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "password_change_rate_limited" },
+  })
+);
+app.use(
+  "/api/devices/pair",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: "device_pairing_rate_limited" },
+  })
+);
+app.use(
+  "/api/parts/branch-availability",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "branch_inventory_rate_limited" },
+  })
+);
+app.use(
+  "/api/compliance/zatca",
+  rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "zatca_rate_limited" },
+  })
 );
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -125,7 +212,16 @@ app.use("/api/admin", authRequired, requireRole("admin"), adminRouter);
 app.use("/api/billing", authRequired, billingRouter);
 app.use("/api/devices", devicesRouter);
 app.use("/api/catalog", authRequired, requireRole("admin"), catalogRouter);
-app.use("/api/vehicles", authRequired, requireActiveSubscription, vehiclesRouter);
+app.use(
+  "/api/vehicles",
+  authRequired,
+  requireActiveSubscription,
+  requireRole("customer", "seller", "admin"),
+  vehiclesRouter
+);
+app.use("/api/procurement", authRequired, requireActiveSubscription, procurementRouter);
+app.use("/api/transfers", authRequired, requireActiveSubscription, transfersRouter);
+app.use("/api/compliance", authRequired, requireRole("admin"), complianceRouter);
 app.use("/api", (_req, res) => res.status(404).json({ error: "api_route_not_found" }));
 
 const publicDirectory = path.join(__dirname, "../public");

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { searchParts, checkout, isDevicePaired, pairDevice } from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
@@ -8,8 +8,10 @@ export default function SellerView({ user }) {
   const [type, setType] = useState("name");
   const [results, setResults] = useState([]);
   const [cart, setCart] = useState([]); // { partId, name, price, quantity }
-  const [paired, setPaired] = useState(isDevicePaired());
+  const [paired, setPaired] = useState(false);
   const [pairingCode, setPairingCode] = useState("");
+
+  useEffect(() => { isDevicePaired().then(setPaired).catch(() => setPaired(false)); }, []);
 
   async function onSearch() {
     setResults(await searchParts(q, type));
@@ -40,7 +42,7 @@ export default function SellerView({ user }) {
 
   async function connectDevice() {
     const result = await pairDevice(pairingCode.trim());
-    if (result.deviceToken) setPaired(true);
+    if (result.device) setPaired(true);
     else alert(result.error || "تعذر ربط الجهاز");
   }
 

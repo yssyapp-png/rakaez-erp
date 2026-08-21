@@ -1,7 +1,19 @@
 import { pool } from "../db/pool.js";
 import { createSafeRouter } from "../utils/safe-router.js";
+import { getCatalogProviderStatuses } from "../utils/catalog-providers.js";
 
 const router = createSafeRouter();
+
+router.get("/providers", (_req, res) => {
+  res.json({
+    providers: getCatalogProviderStatuses(),
+    policy: {
+      licensedAccessOnly: true,
+      scrapingAllowed: false,
+      vinTransmissionEnabled: false,
+    },
+  });
+});
 
 export const SAUDI_STARTER_CATALOG = [
   ["oil-filter", "فلتر زيت المحرك", "فلاتر"],

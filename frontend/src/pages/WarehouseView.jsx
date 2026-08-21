@@ -21,20 +21,21 @@ export default function WarehouseView({ user }) {
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
-  const [paired, setPaired] = useState(isDevicePaired());
+  const [paired, setPaired] = useState(false);
   const [code, setCode] = useState("");
   const [shelfCode, setShelfCode] = useState("");
   const [shelfResult, setShelfResult] = useState(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [showingLowStock, setShowingLowStock] = useState(false);
 
+  useEffect(() => { isDevicePaired().then(setPaired).catch(() => setPaired(false)); }, []);
   useEffect(() => {
     if (paired) getAllParts().then((data) => setParts(Array.isArray(data) ? data : []));
   }, [paired]);
 
   async function connect() {
     const result = await pairDevice(code.trim());
-    if (result.deviceToken) setPaired(true);
+    if (result.device) setPaired(true);
     else setMessage(result.error || "تعذر ربط الجهاز");
   }
 

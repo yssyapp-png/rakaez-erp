@@ -19,12 +19,10 @@ jobs:
 
     strategy:
       matrix:
-        # اختبر فقط على إصدارات Node المدعومة المستخدمة في الإنتاج.
+        # المشروع موحّد بالكامل على Node.js 24.
         node-version: [24.x]
-        # المشروع مقسوم لمجلدين منفصلين، كل واحد فيه package.json خاص به —
-        # لا يوجد package.json بجذر المستودع. هذا هو سبب فشل ٣ من ٨ فحوصات
-        # سابقاً: الخطوات كانت تشتغل بالجذر مباشرة بدون تحديد working-directory
-        # فتفشل فوراً على "npm ci" (ما تلقى ملف package.json أصلاً).
+        # يبقى الاختبار مقسومًا إلى الخادم والواجهة حتى يعزل أي فشل ويعرض
+        # سببه بوضوح، مع وجود package.json إضافي في الجذر للتطوير المحلي.
         project: [backend, frontend]
 
     defaults:
@@ -110,3 +108,39 @@ jobs:
         file: ./backend/Dockerfile
         push: false
         tags: rakaez-erp:${{ github.sha }}
+
+  database-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rakaez_ci
+          POSTGRES_USER: rakaez_ci
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rakaez_ci -d rakaez_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgres://rakaez_ci:ci-only-password@127.0.0.1:5432/rakaez_ci
+      DB_SSL: "false"
+      NODE_ENV: test
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24.x
+        cache: npm
+        cache-dependency-path: backend/package-lock.json
+    - run: npm ci --ignore-scripts
+    - name: Apply every migration to a clean database
+      run: npm run migrate
+    - name: Verify the migration result
+      run: node dbtest.mjs

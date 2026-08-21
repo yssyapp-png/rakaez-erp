@@ -8,6 +8,7 @@ import {
   getDevices,
   getInvoices,
   getInventoryMovements,
+  getCatalogProviders,
   getOrganization,
   revokeDevice,
   previewSaudiStarterCatalog,
@@ -68,6 +69,7 @@ export default function AdminView() {
       <BranchManagement branches={branches} onChanged={() => getBranchesSummary().then(setBranches)} />
       <DeviceManagement branches={branches} devices={devices} onDevicesChanged={() => getDevices().then(setDevices)} />
       <EmployeeInvitations branches={branches} />
+      <CatalogProviders />
       <SaudiCatalogImport />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
@@ -156,18 +158,89 @@ export default function AdminView() {
   );
 }
 
+const PROVIDER_CAPABILITY_KEYS = {
+  vin_decode: "catalog_capability_vin",
+  vin_frame_search: "catalog_capability_vin_frame",
+  oem_catalog: "catalog_capability_oem",
+  diagrams: "catalog_capability_diagrams",
+  applicability: "catalog_capability_applicability",
+  price: "catalog_capability_price",
+  availability: "catalog_capability_availability",
+};
+
+function CatalogProviders() {
+  const { t } = useLanguage();
+  const [data, setData] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getCatalogProviders()
+      .then((result) => {
+        if (!active) return;
+        if (!Array.isArray(result?.providers)) return setLoadError(true);
+        setData(result);
+      })
+      .catch(() => active && setLoadError(true));
+    return () => { active = false; };
+  }, []);
+
+  return (
+    <section className="rk-card rk-catalog-providers" aria-labelledby="catalog-providers-title">
+      <div className="rk-page-heading">
+        <div>
+          <h3 id="catalog-providers-title">{t("catalog_providers_title")}</h3>
+          <p>{t("catalog_providers_subtitle")}</p>
+        </div>
+        <span className="rk-provider-privacy">{t("catalog_providers_private")}</span>
+      </div>
+      {loadError && <p className="rk-alert error" role="alert">{t("catalog_providers_load_error")}</p>}
+      {!data && !loadError && <p>{t("loading")}</p>}
+      {data && <>
+        <div className="rk-provider-grid">
+          {data.providers.map((provider) => (
+            <article className="rk-provider-card" key={provider.id}>
+              <div className="rk-provider-card-heading">
+                <div>
+                  <span>{provider.id === "7zap-levam" ? t("catalog_provider_identification") : t("catalog_provider_supply")}</span>
+                  <h4>{provider.name}</h4>
+                </div>
+                <strong className={`rk-provider-status ${provider.enabled ? "pending" : "disabled"}`}>
+                  {t(`catalog_provider_status_${provider.status}`)}
+                </strong>
+              </div>
+              <div className="rk-provider-capabilities" aria-label={t("catalog_provider_capabilities")}>
+                {provider.capabilities.map((capability) => (
+                  <span key={capability}>{t(PROVIDER_CAPABILITY_KEYS[capability] || capability)}</span>
+                ))}
+              </div>
+              <dl className="rk-provider-checks">
+                <div><dt>{t("catalog_provider_license")}</dt><dd>{provider.licenseApproved ? t("catalog_provider_complete") : t("catalog_provider_required")}</dd></div>
+                <div><dt>{t("catalog_provider_credentials")}</dt><dd>{provider.credentialsConfigured ? t("catalog_provider_complete") : t("catalog_provider_required")}</dd></div>
+              </dl>
+            </article>
+          ))}
+        </div>
+        {data.policy?.licensedAccessOnly && <p className="rk-provider-policy">{t("catalog_provider_policy")}</p>}
+      </>}
+    </section>
+  );
+}
+
 function OrganizationSettings({ org, onUpdated }) {
   const [name, setName] = useState(org?.name || "");
   const [vatNumber, setVatNumber] = useState(org?.vat_number || "");
+  const [commercialRegistrationNumber, setCommercialRegistrationNumber] = useState(org?.commercial_registration_number || "");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     setName(org?.name || "");
     setVatNumber(org?.vat_number || "");
-  }, [org?.id, org?.name, org?.vat_number]);
+    setCommercialRegistrationNumber(org?.commercial_registration_number || "");
+  }, [org?.id, org?.name, org?.vat_number, org?.commercial_registration_number]);
 
   async function save() {
-    const result = await updateOrganization(name.trim(), vatNumber.trim());
+    const result = await updateOrganization(name.trim(), vatNumber.trim(), commercialRegistrationNumber.trim());
     if (result.error) return setMessage(`تعذر الحفظ: ${result.error}`);
     setMessage("تم حفظ بيانات المنشأة. أصبحت هوية الفاتورة الضريبية جاهزة.");
     onUpdated();
@@ -177,10 +250,12 @@ function OrganizationSettings({ org, onUpdated }) {
     <section className="rk-card" style={{ marginBottom: 20 }}>
       <h3>بيانات المنشأة والفاتورة الضريبية</h3>
       {!/^\d{15}$/.test(vatNumber) && <p style={{ color: "#b91c1c" }}>لن يسمح النظام بإصدار فاتورة حتى إدخال الرقم الضريبي الصحيح المكوّن من 15 رقمًا.</p>}
+      {!/^\d{10}$/.test(commercialRegistrationNumber) && <p style={{ color: "#b91c1c" }}>أدخل رقم السجل التجاري المكوّن من 10 أرقام لاستكمال ملف الامتثال.</p>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input className="rk-input" maxLength={200} value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم القانوني للمنشأة" />
         <input className="rk-input" dir="ltr" inputMode="numeric" maxLength={15} value={vatNumber} onChange={(e) => setVatNumber(e.target.value.replace(/\D/g, ""))} placeholder="الرقم الضريبي (15 رقمًا)" />
-        <button className="rk-btn" disabled={!name.trim() || !/^\d{15}$/.test(vatNumber)} onClick={save}>حفظ بيانات المنشأة</button>
+        <input className="rk-input" dir="ltr" inputMode="numeric" maxLength={10} value={commercialRegistrationNumber} onChange={(e) => setCommercialRegistrationNumber(e.target.value.replace(/\D/g, ""))} placeholder="السجل التجاري (10 أرقام)" />
+        <button className="rk-btn" disabled={!name.trim() || !/^\d{15}$/.test(vatNumber) || !/^\d{10}$/.test(commercialRegistrationNumber)} onClick={save}>حفظ بيانات المنشأة</button>
       </div>
       {message && <p>{message}</p>}
     </section>
@@ -246,6 +321,7 @@ function EmployeeInvitations({ branches }) {
         <select className="rk-select" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="seller">بائع / كاشير</option>
           <option value="warehouse_keeper">مأمور مستودع</option>
+          <option value="branch_manager">مدير فرع</option>
           <option value="customer">عميل</option>
         </select>
         {role !== "customer" && (

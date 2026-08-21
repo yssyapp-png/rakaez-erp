@@ -33,12 +33,18 @@ router.post("/invitations", async (req, res) => {
   const body = req.body || {};
   const email = String(body.email || "").trim().toLowerCase();
   const role = body.role;
-  const branchId = body.branchId || null;
-  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["customer", "seller", "warehouse_keeper"].includes(role)) {
+  const branchId = body.branchId == null || body.branchId === "" ? null : Number(body.branchId);
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["customer", "seller", "warehouse_keeper", "branch_manager"].includes(role)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
-  if (["seller", "warehouse_keeper"].includes(role) && !branchId) {
+  if (
+    ["seller", "warehouse_keeper", "branch_manager"].includes(role) &&
+    (!Number.isInteger(branchId) || branchId < 1)
+  ) {
     return res.status(400).json({ error: "employee_branch_required" });
+  }
+  if (role === "customer" && branchId !== null) {
+    return res.status(400).json({ error: "customer_branch_not_allowed" });
   }
 
   const client = await pool.connect();
@@ -141,7 +147,8 @@ router.get("/inventory-movements", async (req, res) => {
 /** GET /api/admin/organization — the tenant's own profile + subscription status */
 router.get("/organization", async (req, res) => {
   const r = await pool.query(
-    `SELECT id, name, login_code, vat_number, plan, plan_price_sar, trial_ends_at,
+    `SELECT id, name, login_code, vat_number, commercial_registration_number,
+            plan, plan_price_sar, trial_ends_at,
             subscription_status, next_billing_at, billing_interval, created_at,
             (moyasar_card_token IS NOT NULL) AS has_payment_method
      FROM organizations WHERE id = $1`,
@@ -153,13 +160,17 @@ router.get("/organization", async (req, res) => {
 router.put("/organization", async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const vatNumber = String(req.body?.vatNumber || "").replace(/\s/g, "");
-  if (!name || name.length > 200 || !/^\d{15}$/.test(vatNumber)) {
+  const commercialRegistrationNumber = String(req.body?.commercialRegistrationNumber || "").replace(/\s/g, "");
+  if (
+    !name || name.length > 200 || !/^\d{15}$/.test(vatNumber) ||
+    !/^\d{10}$/.test(commercialRegistrationNumber)
+  ) {
     return res.status(400).json({ error: "invalid_organization_details" });
   }
   const result = await pool.query(
-    `UPDATE organizations SET name = $1, vat_number = $2
-     WHERE id = $3 RETURNING id, name, vat_number, login_code`,
-    [name, vatNumber, req.user.organizationId]
+    `UPDATE organizations SET name = $1, vat_number = $2, commercial_registration_number = $3
+     WHERE id = $4 RETURNING id, name, vat_number, commercial_registration_number, login_code`,
+    [name, vatNumber, commercialRegistrationNumber, req.user.organizationId]
   );
   if (!result.rows[0]) return res.status(404).json({ error: "organization_not_found" });
   res.json(result.rows[0]);

@@ -3,6 +3,7 @@ import { deviceRequired } from "./devices.js";
 import { normalizeVin } from "./vehicles.js";
 import { requireRole } from "./auth.js";
 import { createSafeRouter } from "../utils/safe-router.js";
+import { recordSecurityEvent, securityHash } from "../utils/security.js";
 
 const router = createSafeRouter();
 
@@ -78,6 +79,66 @@ export function normalizeWarehouseLookup(value) {
   return normalized && normalized.length <= 120 ? normalized : null;
 }
 
+const BRANCH_INVENTORY_SEARCH_TYPES = new Set(["all", "part_number", "barcode", "oem", "name"]);
+
+/**
+ * Normalizes the cross-branch availability query and escapes SQL LIKE
+ * metacharacters. Requiring at least two visible characters prevents a
+ * branch manager from turning this lookup into an unbounded catalog export.
+ */
+export function normalizeBranchInventorySearch(value, type = "all") {
+  const query = String(value ?? "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
+  const normalizedType = String(type || "all");
+  if (query.length < 2 || query.length > 120 || !BRANCH_INVENTORY_SEARCH_TYPES.has(normalizedType)) {
+    return null;
+  }
+  return {
+    query,
+    type: normalizedType,
+    likeQuery: `%${query.replace(/[\\%_]/g, "\\$&")}%`,
+  };
+}
+
+export function groupBranchInventoryRows(rows, currentBranchId) {
+  const parts = [];
+  const byId = new Map();
+  for (const row of rows) {
+    let part = byId.get(row.part_id);
+    if (!part) {
+      part = {
+        id: row.part_id,
+        partNumber: row.part_number,
+        name: row.name,
+        brand: row.brand,
+        category: row.category,
+        barcode: row.barcode,
+        oemNumbers: row.oem_numbers,
+        crossReferenceNumbers: row.cross_reference_numbers,
+        totalAvailable: 0,
+        availability: [],
+      };
+      byId.set(row.part_id, part);
+      parts.push(part);
+    }
+    const quantity = Number(row.quantity);
+    part.totalAvailable += quantity;
+    part.availability.push({
+      branchId: row.branch_id,
+      branchName: row.branch_name,
+      city: row.branch_city,
+      quantity,
+      shelfSection: row.shelf_section,
+      shelfNumber: row.shelf_number,
+      shelfLevel: row.shelf_level,
+      isCurrentBranch: Number(row.branch_id) === Number(currentBranchId),
+    });
+  }
+  return parts;
+}
+
 async function branchBelongsToOrganization(client, branchId, organizationId) {
   const result = await client.query(
     "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
@@ -102,6 +163,9 @@ const STAFF_PART_COLUMNS = `${CUSTOMER_PART_COLUMNS}, p.cost, p.catalog_status,
  * leak across tenants, so it appears in every query below, not just once.
  */
 router.get("/search", async (req, res) => {
+  if (!["customer", "seller", "warehouse_keeper", "admin"].includes(req.user.role)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
   const { q = "", type = "name" } = req.query;
   const searchTerm = String(q).trim();
   if (!searchTerm) return res.status(400).json({ error: "search_required" });
@@ -195,6 +259,116 @@ router.get("/search", async (req, res) => {
     res.status(500).json({ error: "search_failed" });
   }
 });
+
+/**
+ * GET /api/parts/branch-availability?q=...&type=all|part_number|barcode|oem|name
+ *
+ * Read-only network availability for branch managers. The organization id
+ * and current branch id always come from the verified server session. Both
+ * parts and branches are independently tenant-scoped in SQL so guessed ids
+ * can never expose another company's stock. Cost and supplier data are not
+ * selected. Only positive stock is returned, capped at 50 matched parts.
+ */
+router.get(
+  "/branch-availability",
+  requireRole("branch_manager", "admin"),
+  async (req, res) => {
+    const search = normalizeBranchInventorySearch(req.query.q, req.query.type);
+    if (!search) return res.status(400).json({ error: "invalid_branch_inventory_search" });
+    if (req.user.role === "branch_manager" && !req.user.branchId) {
+      return res.status(403).json({ error: "employee_branch_required" });
+    }
+
+    try {
+      const result = await pool.query(
+        `WITH matched_parts AS (
+           SELECT p.id, p.part_number, p.name, p.brand, p.category, p.barcode,
+                  p.oem_numbers, p.cross_reference_numbers
+           FROM parts p
+           WHERE p.organization_id = $1
+             AND p.catalog_status = 'active'
+             AND (
+               ($4 = 'barcode' AND p.barcode = $2)
+               OR ($4 = 'part_number' AND p.part_number ILIKE $3 ESCAPE '\\')
+               OR ($4 = 'oem' AND EXISTS (
+                 SELECT 1 FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS code
+                 WHERE code ILIKE $3 ESCAPE '\\'
+               ))
+               OR ($4 = 'name' AND (
+                 p.name ILIKE $3 ESCAPE '\\'
+                 OR coalesce(p.brand, '') ILIKE $3 ESCAPE '\\'
+                 OR coalesce(p.category, '') ILIKE $3 ESCAPE '\\'
+               ))
+               OR ($4 = 'all' AND (
+                 p.barcode = $2
+                 OR p.part_number ILIKE $3 ESCAPE '\\'
+                 OR p.name ILIKE $3 ESCAPE '\\'
+                 OR coalesce(p.brand, '') ILIKE $3 ESCAPE '\\'
+                 OR coalesce(p.category, '') ILIKE $3 ESCAPE '\\'
+                 OR EXISTS (
+                   SELECT 1 FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS code
+                   WHERE code ILIKE $3 ESCAPE '\\'
+                 )
+               ))
+             )
+           ORDER BY CASE
+             WHEN p.barcode = $2 OR upper(p.part_number) = upper($2) THEN 0
+             WHEN EXISTS (
+               SELECT 1 FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS exact_code
+               WHERE upper(exact_code) = upper($2)
+             ) THEN 1
+             ELSE 2
+           END, p.name
+           LIMIT 50
+         )
+         SELECT mp.id AS part_id, mp.part_number, mp.name, mp.brand, mp.category,
+                mp.barcode, mp.oem_numbers, mp.cross_reference_numbers,
+                b.id AS branch_id, b.name AS branch_name, b.city AS branch_city,
+                i.quantity, i.shelf_section, i.shelf_number, i.shelf_level
+         FROM matched_parts mp
+         JOIN inventory i ON i.part_id = mp.id AND i.quantity > 0
+         JOIN branches b ON b.id = i.branch_id AND b.organization_id = $1
+         ORDER BY mp.name,
+                  CASE WHEN b.id = $5::integer THEN 0 ELSE 1 END,
+                  i.quantity DESC, b.name`,
+        [
+          req.user.organizationId,
+          search.query,
+          search.likeQuery,
+          search.type,
+          req.user.branchId ?? null,
+        ]
+      );
+
+      const parts = groupBranchInventoryRows(result.rows, req.user.branchId);
+
+      await recordSecurityEvent(pool, {
+        req,
+        organizationId: req.user.organizationId,
+        userId: req.user.id,
+        sessionId: req.user.sid,
+        eventType: "branch_inventory_searched",
+        outcome: "success",
+        metadata: {
+          search_type: search.type,
+          query_hash: securityHash(`branch-inventory-query\n${search.query}`).slice(0, 24),
+          result_count: parts.length,
+        },
+      });
+
+      res.json({
+        query: search.query,
+        type: search.type,
+        currentBranchId: req.user.branchId ?? null,
+        count: parts.length,
+        parts,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "branch_inventory_search_failed" });
+    }
+  }
+);
 
 router.get("/", requireRole("admin", "warehouse_keeper"), async (req, res) => {
   const columns = req.user.role === "warehouse_keeper" ? CUSTOMER_PART_COLUMNS : STAFF_PART_COLUMNS;

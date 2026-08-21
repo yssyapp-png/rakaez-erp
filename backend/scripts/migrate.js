@@ -3,22 +3,10 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pool } from "../src/db/pool.js";
+import { migrationFiles } from "../src/db/migrations.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDirectory = path.resolve(root, "../src/db");
-const migrationFiles = [
-  "migration_billing_interval.sql",
-  "migration_security_constraints.sql",
-  "migration_invitations_and_customer_invoices.sql",
-  "migration_devices_and_inventory_audit.sql",
-  "migration_global_catalog.sql",
-  "migration_customer_vehicles.sql",
-  "migration_tenant_login_codes.sql",
-  "migration_inventory_import_audit.sql",
-  "migration_payment_hardening.sql",
-  "migration_api_surface_security.sql",
-];
-
 const client = await pool.connect();
 try {
   await client.query("SELECT pg_advisory_lock(731954201)");

@@ -8,9 +8,15 @@ COPY frontend/ ./
 ARG VITE_API_BASE_URL=/api
 ARG VITE_MOYASAR_PUBLISHABLE_KEY=
 ARG VITE_PAYMENTS_ENABLED=false
+ARG VITE_PUBLIC_REGISTRATION_ENABLED=false
+ARG VITE_MOYASAR_SCRIPT_INTEGRITY=
+ARG VITE_MOYASAR_STYLE_INTEGRITY=
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_MOYASAR_PUBLISHABLE_KEY=$VITE_MOYASAR_PUBLISHABLE_KEY
 ENV VITE_PAYMENTS_ENABLED=$VITE_PAYMENTS_ENABLED
+ENV VITE_PUBLIC_REGISTRATION_ENABLED=$VITE_PUBLIC_REGISTRATION_ENABLED
+ENV VITE_MOYASAR_SCRIPT_INTEGRITY=$VITE_MOYASAR_SCRIPT_INTEGRITY
+ENV VITE_MOYASAR_STYLE_INTEGRITY=$VITE_MOYASAR_STYLE_INTEGRITY
 RUN npm run build
 
 FROM node:24-alpine AS dependencies
@@ -19,12 +25,14 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
 FROM node:24-alpine
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    NODE_OPTIONS=--disable-proto=throw
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY backend/package.json backend/package-lock.json ./
 COPY backend/src ./src
 COPY backend/scripts ./scripts
+COPY backend/certs ./certs
 COPY --from=web-build /web/dist ./public
 USER node
 EXPOSE 4000
