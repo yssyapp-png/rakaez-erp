@@ -4,12 +4,14 @@ import MoyasarCheckout from "../components/MoyasarCheckout.jsx";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 export default function BillingView() {
+  const paymentsEnabled = import.meta.env.VITE_PAYMENTS_ENABLED === "true";
   const { t } = useLanguage();
   const [status, setStatus] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [interval, setInterval] = useState("monthly"); // chosen BEFORE first activation
   const [message, setMessage] = useState(null);
   const [switching, setSwitching] = useState(false);
+  const [paymentReference, setPaymentReference] = useState("");
 
   function refresh() {
     getBillingStatus().then(setStatus);
@@ -17,24 +19,73 @@ export default function BillingView() {
 
   useEffect(refresh, []);
 
+  useEffect(() => {
+    if (!status) return;
+    const paymentId = new URLSearchParams(window.location.search).get("id");
+    const rawPending = sessionStorage.getItem("rakaez_pending_payment");
+    if (!paymentId || !rawPending) return;
+    let pending;
+    try {
+      pending = JSON.parse(rawPending);
+    } catch {
+      sessionStorage.removeItem("rakaez_pending_payment");
+      return;
+    }
+    if (pending.purpose !== "subscription_activation" || String(pending.organizationId) !== String(status.id)) return;
+    activateSubscription(paymentId, pending.requestReference, pending.interval)
+      .then((result) => {
+        if (!result.error) {
+          setMessage({ type: "success", text: result.message });
+          sessionStorage.removeItem("rakaez_pending_payment");
+          window.history.replaceState({}, "", window.location.pathname);
+          refresh();
+        } else {
+          setMessage({
+            type: "error",
+            text: `${t("error_prefix")}: ${result.error}. احتفظ بمرجع الدفع وتواصل مع الدعم إذا تم الخصم.`,
+          });
+        }
+      })
+      .catch(() => setMessage({ type: "error", text: "تعذر الاتصال بالخادم للتحقق من الدفعة. احتفظ بمرجع الدفع وأعد المحاولة." }));
+  }, [status?.id, t]);
+
   async function onCardSaved(payment) {
     setShowForm(false);
-    if (payment.status !== "paid") {
+    if (payment.status === "initiated") return;
+    if (payment.status !== "paid" && payment.status !== "captured") {
       setMessage({ type: "error", text: t("payment_incomplete") + ": " + payment.status });
       return;
     }
-    const token = payment.source?.token;
-    if (!token) {
+    if (!payment.source?.token) {
       setMessage({ type: "error", text: "تعذّر حفظ بيانات البطاقة للتجديد التلقائي — حاول مرة أخرى." });
       return;
     }
-    const result = await activateSubscription(token, interval);
+    let result;
+    try {
+      result = await activateSubscription(payment.id, paymentReference, interval);
+    } catch {
+      setMessage({ type: "error", text: "تعذر الاتصال بالخادم للتحقق من الدفعة. احتفظ بمرجع الدفع وأعد المحاولة." });
+      return;
+    }
     if (result.error) {
       setMessage({ type: "error", text: `${t("error_prefix")}: ${result.error}` });
       return;
     }
+    sessionStorage.removeItem("rakaez_pending_payment");
     setMessage({ type: "success", text: result.message });
     refresh();
+  }
+
+  function beginActivation() {
+    const requestReference = crypto.randomUUID();
+    setPaymentReference(requestReference);
+    sessionStorage.setItem("rakaez_pending_payment", JSON.stringify({
+      purpose: "subscription_activation",
+      requestReference,
+      interval,
+      organizationId: status.id,
+    }));
+    setShowForm(true);
   }
 
   async function onSwitchInterval(newInterval) {
@@ -116,7 +167,12 @@ export default function BillingView() {
         </div>
       )}
 
-      {!status.has_payment_method && !showForm && (
+      {!paymentsEnabled && (
+        <div style={{ padding: 12, borderRadius: 8, background: "#fffbeb", border: "1px solid #fcd34d" }}>
+          الدفع الإلكتروني غير مفعّل في النسخة التجريبية. لن يتم خصم أي مبلغ.
+        </div>
+      )}
+      {paymentsEnabled && !status.has_payment_method && !showForm && (
         <div>
           <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{t("choose_cycle")}</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -155,13 +211,13 @@ export default function BillingView() {
               </div>
             </button>
           </div>
-          <button className="rk-btn" style={{ width: "100%" }} onClick={() => setShowForm(true)}>
+          <button className="rk-btn" style={{ width: "100%" }} onClick={beginActivation}>
             {t("add_card_activate")}
           </button>
         </div>
       )}
 
-      {showForm && (
+      {paymentsEnabled && showForm && (
         <div>
           <p style={{ fontSize: 12, color: "#777" }}>
             {t(interval === "yearly" ? "yearly_charge_notice" : "monthly_charge_notice", { amount: chosenAmount.toFixed(2) })}
@@ -170,8 +226,17 @@ export default function BillingView() {
             amountSar={chosenAmount}
             description={`تفعيل اشتراك ركائز - ${status.name} - ${interval === "yearly" ? "سنوي" : "شهري"}`}
             saveCard={true}
+            paymentMetadata={{
+              rakaez_purpose: "subscription_activation",
+              rakaez_request_reference: paymentReference,
+              rakaez_organization_id: String(status.id),
+            }}
             onCompleted={onCardSaved}
-            onCancel={() => setShowForm(false)}
+            onCancel={() => {
+              setShowForm(false);
+              setPaymentReference("");
+              sessionStorage.removeItem("rakaez_pending_payment");
+            }}
           />
         </div>
       )}

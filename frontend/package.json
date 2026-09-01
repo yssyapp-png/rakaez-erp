@@ -2,10 +2,18 @@
   "name": "rakaez-frontend",
   "version": "0.1.0",
   "type": "module",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=10 <12"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "test": "node --test",
+    "preview": "vite preview",
+    "audit:production": "npm audit --omit=dev --audit-level=moderate"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -14,5 +22,8 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^5.2.0",
     "vite": "^6.4.3"
+  },
+  "overrides": {
+    "nanoid": "^3.3.18"
   }
 }

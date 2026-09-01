@@ -2,9 +2,19 @@
   "name": "rakaez-backend",
   "version": "0.1.0",
   "type": "module",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=10 <12"
+  },
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "migrate": "node scripts/migrate.js",
+    "monitor:security": "node scripts/security-monitor.js",
+    "test": "JWT_SECRET=test-secret-with-at-least-32-characters node --test",
+    "audit:production": "npm audit --omit=dev --audit-level=moderate"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

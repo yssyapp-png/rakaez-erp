@@ -1,8 +1,8 @@
-name: CI/CD Pipeline
+name: CI Pipeline
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ main, develop, feature/*, agent/** ]
   pull_request:
     branches: [ main, develop ]
 
@@ -19,13 +19,10 @@ jobs:
 
     strategy:
       matrix:
-        # حذفنا 16.x — وصل نهاية الدعم (EOL) وهذا سبب أحد تنبيهات الأمان؛
-        # 18.x و20.x كافيين للتأكد من التوافق بدون استخدام إصدار غير مدعوم.
-        node-version: [18.x, 20.x]
-        # المشروع مقسوم لمجلدين منفصلين، كل واحد فيه package.json خاص به —
-        # لا يوجد package.json بجذر المستودع. هذا هو سبب فشل ٣ من ٨ فحوصات
-        # سابقاً: الخطوات كانت تشتغل بالجذر مباشرة بدون تحديد working-directory
-        # فتفشل فوراً على "npm ci" (ما تلقى ملف package.json أصلاً).
+        # المشروع موحّد بالكامل على Node.js 24.
+        node-version: [24.x]
+        # يبقى الاختبار مقسومًا إلى الخادم والواجهة حتى يعزل أي فشل ويعرض
+        # سببه بوضوح، مع وجود package.json إضافي في الجذر للتطوير المحلي.
         project: [backend, frontend]
 
     defaults:
@@ -43,7 +40,7 @@ jobs:
         cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci
+      run: npm ci --ignore-scripts
 
     - name: Run linter
       run: npm run lint --if-present
@@ -55,10 +52,6 @@ jobs:
       # --if-present لأن الباك إند (Node/Express) ما له سكربت "build" أصلاً
       # (سكربتاته فقط dev/start) — فقط الفرونت إند (Vite) يبني فعلياً.
       run: npm run build --if-present
-
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v5
-      if: matrix.node-version == '18.x' && matrix.project == 'frontend'
 
   security-scan:
     runs-on: ubuntu-latest
@@ -77,67 +70,77 @@ jobs:
     - name: Use Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: 20.x
+        node-version: 24.x
         cache: 'npm'
         cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci
+      run: npm ci --ignore-scripts
 
-    - name: Run npm audit
-      run: npm audit --audit-level=moderate
-      continue-on-error: true
+    - name: Reject tracked secrets and environment files
+      if: matrix.project == 'backend'
+      working-directory: ${{ github.workspace }}
+      run: sh scripts/security-check.sh
 
-    - name: Run OWASP Dependency-Check
-      uses: dependency-check/Dependency-Check_Action@main
-      continue-on-error: true
+    - name: Audit production dependencies
+      run: npm audit --omit=dev --audit-level=moderate
+
+    - name: Audit the complete dependency tree
+      run: npm audit --audit-level=high
+
+    - name: Check lockfile integrity
+      run: npm ls --all
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build full web production image
+      uses: docker/build-push-action@v6
       with:
-        project: 'rakaez-erp-${{ matrix.project }}'
-        path: '.'
-        format: 'JSON'
+        context: .
+        file: ./backend/Dockerfile
+        push: false
+        tags: rakaez-erp:${{ github.sha }}
 
-  deploy-dev:
+  database-migrations:
     runs-on: ubuntu-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rakaez_ci
+          POSTGRES_USER: rakaez_ci
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rakaez_ci -d rakaez_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgres://rakaez_ci:ci-only-password@127.0.0.1:5432/rakaez_ci
+      DB_SSL: "false"
+      NODE_ENV: test
     steps:
     - uses: actions/checkout@v5
-
-    - name: Deploy to Development
-      run: echo "Deploying to development server..."
-      # أضف أوامر التحديث الفعلية هنا
-
-  deploy-prod:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-    - uses: actions/checkout@v5
-
-    - name: Deploy to Production
-      run: echo "Deploying to production server..."
-      # أضف أوامر التحديث الفعلية هنا
-
-  # docker-build مُعطّل مؤقتاً: كان يحاول يبني صورة Docker من جذر المستودع
-  # لكن لا يوجد أي Dockerfile بالمشروع حالياً (لا بالجذر ولا بأي مجلد) —
-  # فكان يفشل في كل مرة من الأساس. أعد تفعيله (احذف الـ # من كل سطر تحت)
-  # بعد ما تضيف Dockerfile حقيقي لأحد المجلدين (غالباً backend للنشر).
-  #
-  # docker-build:
-  #   runs-on: ubuntu-latest
-  #   needs: build-and-test
-  #
-  #   steps:
-  #   - uses: actions/checkout@v5
-  #
-  #   - name: Set up Docker Buildx
-  #     uses: docker/setup-buildx-action@v4
-  #
-  #   - name: Build Docker image
-  #     uses: docker/build-push-action@v6
-  #     with:
-  #       context: ./backend
-  #       push: false
-  #       tags: rakaez-erp:latest
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24.x
+        cache: npm
+        cache-dependency-path: backend/package-lock.json
+    - run: npm ci --ignore-scripts
+    - name: Apply every migration to a clean database
+      run: npm run migrate
+    - name: Verify the migration result
+      run: node dbtest.mjs

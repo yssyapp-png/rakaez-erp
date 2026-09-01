@@ -1,28 +1,51 @@
-import { Router } from "express";
-import rateLimit from "express-rate-limit";
 import { pool } from "../db/pool.js";
 import { requireRole } from "./auth.js";
 import { buildZatcaQrBase64 } from "../utils/zatca.js";
-import { createMoyasarPayment, refundMoyasarPayment } from "../utils/moyasar.js";
+import crypto from "crypto";
+import { fetchMoyasarPayment, isUuid, paymentMatches, refundOutstandingMoyasarPayment } from "../utils/moyasar.js";
+import { deviceRequired } from "./devices.js";
+import { createSafeRouter } from "../utils/safe-router.js";
 
-const router = Router();
+const router = createSafeRouter();
 
-// Security fix: payment-initiating routes were only covered by the general
-// 300-req/15min /api limiter, which is far too loose for endpoints that
-// charge a card — that limit lets an attacker run hundreds of card-testing
-// attempts before being blocked. Apply a much tighter limit specifically
-// to checkout routes.
-const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "too_many_requests", message: "محاولات كثيرة جداً — يرجى المحاولة لاحقاً." },
-});
+const MAX_CHECKOUT_LINES = 200;
+
+function publicSalesError(error, fallback) {
+  const message = String(error?.message || "");
+  if (message === "part_not_found" || message === "organization_vat_number_required") return message;
+  if (message.startsWith("insufficient_stock:")) return "insufficient_stock";
+  return fallback;
+}
+
+export function hasValidItems(items) {
+  if (!Array.isArray(items) || items.length === 0 || items.length > MAX_CHECKOUT_LINES) return false;
+  const partIds = new Set();
+  return items.every((item) => {
+    const partId = typeof item.partId === "string" ? item.partId.trim() : "";
+    if (!partId || partId.length > 100 || partIds.has(partId)) return false;
+    partIds.add(partId);
+    return Number.isInteger(Number(item.quantity)) && Number(item.quantity) > 0;
+  });
+}
+
+async function requireOwnedBranch(client, branchId, orgId) {
+  const result = await client.query(
+    "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
+    [branchId, orgId]
+  );
+  return Boolean(result.rows[0]);
+}
 
 async function getOrganization(client, orgId) {
   const r = await client.query("SELECT * FROM organizations WHERE id = $1", [orgId]);
-  return r.rows[0] || { name: "ركائز لقطع غيار السيارات", vat_number: "000000000000000" };
+  return r.rows[0] || null;
+}
+
+function requireInvoiceIdentity(organization) {
+  if (!organization || !organization.name || !/^\d{15}$/.test(String(organization.vat_number || ""))) {
+    throw new Error("organization_vat_number_required");
+  }
+  return organization;
 }
 
 /**
@@ -40,58 +63,24 @@ async function findPartId(client, orgId, partNumber) {
 }
 
 /**
- * Security fix: neither checkout route validated that item.quantity was a
- * positive integer. A negative quantity would DECREASE the computed
- * subtotal (reducing what the customer pays) while simultaneously making
- * `inventory.quantity - quantity` INCREASE stock, and the guard clause
- * `quantity >= $1` becomes trivially true for negative $1 — so it silently
- * let a cart mix negative and positive line items to both underpay and
- * inflate the shop's own inventory. Reject anything that isn't a positive
- * integer before any pricing or stock math happens.
- */
-function validateItemQuantities(items) {
-  for (const item of items) {
-    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
-      throw new Error(`invalid_quantity:${item.partId}`);
-    }
-  }
-}
-
-/**
  * POST /api/sales/checkout
  * body: { items: [{ partId (= part_number), quantity }] }
  * branchId, sellerId, and organizationId all come from the authenticated
  * user (req.user) — never trust these from the request body, or a seller
  * at one shop could invoice against another shop's branch/inventory.
  */
-router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (req, res) => {
+router.post("/checkout", requireRole("seller", "admin"), deviceRequired, async (req, res) => {
   const { items } = req.body;
   const orgId = req.user.organizationId;
   const sellerId = req.user.id;
-  const branchId = req.body.branchId || req.user.branchId;
+  const branchId = req.device.branch_id;
   if (!branchId) return res.status(400).json({ error: "missing_branch" });
-  if (!items?.length) return res.status(400).json({ error: "empty_cart" });
-  try {
-    validateItemQuantities(items);
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
-  }
+  if (!hasValidItems(items)) return res.status(400).json({ error: "invalid_items" });
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    // Security fix: the comment above always said branchId must never be
-    // trusted from the request body, but the code was doing exactly that
-    // (req.body.branchId took priority over req.user.branchId). Verify the
-    // branch actually belongs to this seller's organization before using it,
-    // rather than relying on inventory lookups happening to fail for a
-    // mismatched branch.
-    const branchCheck = await client.query(
-      "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
-      [branchId, orgId]
-    );
-    if (!branchCheck.rows.length) {
+    if (!(await requireOwnedBranch(client, branchId, orgId))) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "branch_not_found" });
     }
@@ -114,14 +103,15 @@ router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (
       if (!inv.rows.length) throw new Error(`insufficient_stock:${item.partId}`);
     }
 
+    subtotal = Math.round(subtotal * 100) / 100;
     const vat = Math.round(subtotal * 0.15 * 100) / 100;
-    const total = subtotal + vat;
-    const invoiceNumber = `INV-${Date.now()}`;
+    const total = Math.round((subtotal + vat) * 100) / 100;
+    const invoiceNumber = `INV-${Date.now()}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
     const timestampIso = new Date().toISOString();
-    const org = await getOrganization(client, orgId);
+    const org = requireInvoiceIdentity(await getOrganization(client, orgId));
     const zatcaQr = buildZatcaQrBase64({
       sellerName: org.name,
-      vatNumber: org.vat_number || "000000000000000",
+      vatNumber: org.vat_number,
       timestampIso,
       total,
       vatAmount: vat,
@@ -140,6 +130,12 @@ router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (
          VALUES ($1,$2,$3,$4)`,
         [invoice.id, item.id, item.quantity, item.price]
       );
+      await client.query(
+        `INSERT INTO inventory_movements
+         (organization_id, branch_id, part_id, device_id, performed_by, movement_type, quantity_change, reference_type, reference_id)
+         VALUES ($1,$2,$3,$4,$5,'sale',$6,'invoice',$7)`,
+        [orgId, branchId, item.id, req.device.id, sellerId, -item.quantity, String(invoice.id)]
+      );
     }
 
     await client.query("COMMIT");
@@ -147,7 +143,7 @@ router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (
   } catch (err) {
     await client.query("ROLLBACK");
     console.error(err);
-    res.status(400).json({ error: err.message || "checkout_failed" });
+    res.status(400).json({ error: publicSalesError(err, "checkout_failed") });
   } finally {
     client.release();
   }
@@ -155,36 +151,72 @@ router.post("/checkout", paymentLimiter, requireRole("seller", "admin"), async (
 
 /**
  * POST /api/sales/checkout-online
- * body: { branchId, items: [{partId (= part_number), quantity}], moyasarToken }
- * Used by the customer app: charges the card via Moyasar BEFORE touching
- * inventory, so a failed/declined payment never decrements stock. Requires
+ * body: { branchId, items: [{partId (= part_number), quantity}], paymentId, requestReference }
+ * Used by the customer app after Moyasar's hosted form creates the payment.
+ * The server independently retrieves and verifies that payment before touching inventory. Requires
  * the caller to be authenticated (any role) — customers must have an
  * account, scoped to the same organization as the branch they're buying
  * from, so an invoice can be attributed to someone within that shop's data.
  */
-router.post("/checkout-online", paymentLimiter, async (req, res) => {
-  const { branchId, items, moyasarToken } = req.body;
+router.post("/checkout-online", requireRole("customer", "seller", "admin"), async (req, res) => {
+  if (process.env.PAYMENTS_ENABLED !== "true") {
+    return res.status(503).json({ error: "payments_temporarily_disabled" });
+  }
+  const { branchId, items, paymentId, requestReference } = req.body || {};
   const orgId = req.user.organizationId;
-  if (!items?.length) return res.status(400).json({ error: "empty_cart" });
+  if (!hasValidItems(items)) return res.status(400).json({ error: "invalid_items" });
   if (!branchId) return res.status(400).json({ error: "missing_branch" });
-  if (!moyasarToken) return res.status(400).json({ error: "missing_payment_token" });
-  try {
-    validateItemQuantities(items);
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
+  if (!isUuid(paymentId)) {
+    return res.status(400).json({ error: "invalid_payment_reference" });
+  }
+  if (!isUuid(requestReference)) {
+    return res.status(400).json({ error: "invalid_request_reference" });
   }
 
   const client = await pool.connect();
+  let verifiedOwnedPayment = null;
+  let paymentLockHeld = false;
   try {
-    // Security fix: verify branchId belongs to the caller's organization
-    // before charging the customer's card or touching inventory — the same
-    // issue as in POST /checkout above.
-    const branchCheck = await client.query(
-      "SELECT id FROM branches WHERE id = $1 AND organization_id = $2",
-      [branchId, orgId]
+    // Serializes retries for one Moyasar payment across all API instances.
+    // The lock is released in finally and never blocks unrelated payments.
+    const lockResult = await client.query(
+      "SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired",
+      [`rakaez:online-payment:${paymentId}`]
     );
-    if (!branchCheck.rows.length) {
+    if (!lockResult.rows[0]?.acquired) {
+      res.setHeader("Retry-After", "2");
+      return res.status(409).json({ error: "payment_processing_in_progress", retryable: true });
+    }
+    paymentLockHeld = true;
+    if (!(await requireOwnedBranch(client, branchId, orgId))) {
       return res.status(404).json({ error: "branch_not_found" });
+    }
+    const payment = await fetchMoyasarPayment(paymentId);
+    const metadata = payment.metadata || {};
+    if (
+      metadata.rakaez_purpose !== "online_order" ||
+      metadata.rakaez_request_reference !== requestReference ||
+      String(metadata.rakaez_organization_id) !== String(orgId) ||
+      String(metadata.rakaez_user_id) !== String(req.user.id)
+    ) {
+      return res.status(403).json({ error: "payment_ownership_mismatch" });
+    }
+    verifiedOwnedPayment = payment;
+
+    // A lost HTTP response can make the browser retry after prices change.
+    // Return the already-created invoice using its original total before
+    // repricing, otherwise a valid paid order could be refunded by mistake.
+    const priorInvoice = await client.query(
+      `SELECT * FROM invoices
+       WHERE organization_id = $1 AND customer_id = $2 AND branch_id = $3 AND payment_reference = $4`,
+      [orgId, req.user.id, branchId, payment.id]
+    );
+    if (priorInvoice.rows[0]) {
+      const invoice = priorInvoice.rows[0];
+      if (!paymentMatches(payment, Math.round(Number(invoice.total) * 100), "SAR")) {
+        return res.status(409).json({ error: "payment_reconciliation_required" });
+      }
+      return res.json({ ...invoice, idempotent: true });
     }
 
     // price everything first (read-only) so we know the exact amount to charge
@@ -196,17 +228,21 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
       subtotal += Number(part.price) * item.quantity;
       resolvedItems.push({ id: part.id, price: Number(part.price), quantity: item.quantity });
     }
+    subtotal = Math.round(subtotal * 100) / 100;
     const vat = Math.round(subtotal * 0.15 * 100) / 100;
-    const total = subtotal + vat;
+    const total = Math.round((subtotal + vat) * 100) / 100;
 
-    const payment = await createMoyasarPayment({
-      amountHalalas: Math.round(total * 100),
-      source: { type: "token", token: moyasarToken },
-      description: `طلب ركائز - ${items.length} صنف`,
-    });
-
-    if (payment.status !== "paid") {
-      return res.status(402).json({ error: "payment_not_completed", status: payment.status });
+    const expectedAmountHalalas = Math.round(total * 100);
+    if (!paymentMatches(payment, expectedAmountHalalas, "SAR")) {
+      const isSettled = ["paid", "captured"].includes(payment.status);
+      const refund = isSettled
+        ? await refundOutstandingMoyasarPayment(payment.id)
+        : null;
+      return res.status(402).json({
+        error: "payment_verification_failed",
+        status: payment.status,
+        refunded: refund?.ok ?? false,
+      });
     }
 
     // From this point the customer HAS been charged — any failure below
@@ -214,6 +250,14 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
     // for an order we never actually fulfilled.
     try {
       await client.query("BEGIN");
+      const existingInvoice = await client.query(
+        "SELECT * FROM invoices WHERE organization_id = $1 AND payment_reference = $2 FOR UPDATE",
+        [orgId, payment.id]
+      );
+      if (existingInvoice.rows[0]) {
+        await client.query("COMMIT");
+        return res.json({ ...existingInvoice.rows[0], idempotent: true });
+      }
       for (const item of resolvedItems) {
         const inv = await client.query(
           `UPDATE inventory SET quantity = quantity - $1
@@ -224,21 +268,21 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
         if (!inv.rows.length) throw new Error(`insufficient_stock:${item.id}`);
       }
 
-      const invoiceNumber = `INV-${Date.now()}`;
+      const invoiceNumber = `INV-${Date.now()}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
       const timestampIso = new Date().toISOString();
-      const org = await getOrganization(client, orgId);
+      const org = requireInvoiceIdentity(await getOrganization(client, orgId));
       const zatcaQr = buildZatcaQrBase64({
         sellerName: org.name,
-        vatNumber: org.vat_number || "000000000000000",
+        vatNumber: org.vat_number,
         timestampIso,
         total,
         vatAmount: vat,
       });
 
       const invoiceRes = await client.query(
-        `INSERT INTO invoices (organization_id, invoice_number, branch_id, seller_id, subtotal, vat, total, zatca_status, zatca_qr, payment_status, payment_reference)
-         VALUES ($1,$2,$3,NULL,$4,$5,$6,'generated_locally',$7,'paid',$8) RETURNING *`,
-        [orgId, invoiceNumber, branchId, subtotal, vat, total, zatcaQr, payment.id]
+        `INSERT INTO invoices (organization_id, invoice_number, branch_id, seller_id, customer_id, subtotal, vat, total, zatca_status, zatca_qr, payment_status, payment_reference)
+         VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,'generated_locally',$8,'paid',$9) RETURNING *`,
+        [orgId, invoiceNumber, branchId, req.user.id, subtotal, vat, total, zatcaQr, payment.id]
       );
       const invoice = invoiceRes.rows[0];
 
@@ -247,6 +291,12 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
           `INSERT INTO invoice_items (invoice_id, part_id, quantity, unit_price) VALUES ($1,$2,$3,$4)`,
           [invoice.id, item.id, item.quantity, item.price]
         );
+        await client.query(
+          `INSERT INTO inventory_movements
+           (organization_id, branch_id, part_id, performed_by, movement_type, quantity_change, reference_type, reference_id)
+           VALUES ($1,$2,$3,$4,'sale',$5,'invoice',$6)`,
+          [orgId, branchId, item.id, req.user.id, -item.quantity, String(invoice.id)]
+        );
       }
 
       await client.query("COMMIT");
@@ -254,19 +304,14 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
     } catch (fulfillmentErr) {
       await client.query("ROLLBACK").catch(() => {});
       console.error("Fulfillment failed after successful payment, refunding:", fulfillmentErr);
-      // Reliability fix: refundMoyasarPayment can itself throw (network
-      // error, Moyasar outage) instead of returning {ok:false}. Catch that
-      // case too so the customer still gets the "contact support with this
-      // payment reference" message instead of a bare 500 with no reference.
-      let refund;
-      try {
-        refund = await refundMoyasarPayment(payment.id, Math.round(total * 100));
-      } catch (refundErr) {
-        console.error("RECONCILE NEEDED: auto-refund threw for payment", payment.id, refundErr);
-        refund = { ok: false };
-      }
+      const existing = await client.query(
+        "SELECT * FROM invoices WHERE organization_id = $1 AND payment_reference = $2",
+        [orgId, payment.id]
+      );
+      if (existing.rows[0]) return res.json({ ...existing.rows[0], idempotent: true });
+      const refund = await refundOutstandingMoyasarPayment(payment.id);
       res.status(409).json({
-        error: fulfillmentErr.message || "fulfillment_failed",
+        error: publicSalesError(fulfillmentErr, "fulfillment_failed"),
         refunded: refund.ok,
         message: refund.ok
           ? "تعذّر إتمام الطلب (نفد المخزون على الأرجح) وتم استرجاع كامل المبلغ تلقائياً."
@@ -275,30 +320,104 @@ router.post("/checkout-online", paymentLimiter, async (req, res) => {
     }
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: err.message || "checkout_failed" });
+    if (verifiedOwnedPayment && ["paid", "captured"].includes(verifiedOwnedPayment.status)) {
+      try {
+        const existing = await client.query(
+          "SELECT * FROM invoices WHERE organization_id = $1 AND customer_id = $2 AND payment_reference = $3",
+          [orgId, req.user.id, verifiedOwnedPayment.id]
+        );
+        if (existing.rows[0]) return res.json({ ...existing.rows[0], idempotent: true });
+        const refund = await refundOutstandingMoyasarPayment(verifiedOwnedPayment.id);
+        return res.status(409).json({
+          error: publicSalesError(err, "order_preparation_failed"),
+          refunded: refund.ok,
+          message: refund.ok
+            ? "تعذّر تجهيز الطلب وتم استرجاع كامل المبلغ تلقائيًا."
+            : "تعذّر تجهيز الطلب والاسترجاع التلقائي؛ تواصل مع الدعم بمرجع الدفع: " + verifiedOwnedPayment.id,
+        });
+      } catch (reconciliationError) {
+        console.error("Payment reconciliation failed; leaving payment unchanged for manual review:", reconciliationError);
+        return res.status(503).json({
+          error: "payment_reconciliation_required",
+          paymentReference: verifiedOwnedPayment.id,
+          message: "تعذّر التأكد من حالة الطلب. لم ننفذ استرجاعًا تلقائيًا لتجنب عكس طلب صحيح؛ تواصل مع الدعم.",
+        });
+      }
+    }
+    res.status(400).json({ error: publicSalesError(err, "checkout_failed") });
   } finally {
+    if (paymentLockHeld) {
+      await client.query(
+        "SELECT pg_advisory_unlock(hashtextextended($1, 0))",
+        [`rakaez:online-payment:${paymentId}`]
+      ).catch(() => {});
+    }
     client.release();
   }
 });
 
-// Security fix: this previously had no role restriction, so an
-// authenticated "customer" could list every invoice for the whole
-// organization — not just their own purchases. Restrict to staff.
-// Reliability fix: the old hardcoded LIMIT 50 with no offset meant a shop
-// could only ever see its most recent 50 invoices through this endpoint —
-// there was no way to page further back. Add real pagination.
-router.get("/invoices", requireRole("seller", "admin"), async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 50));
+router.get("/invoices", requireRole("customer", "seller", "admin"), async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 50));
   const offset = (page - 1) * pageSize;
-  const r = await pool.query(
-    `SELECT i.*, b.name AS branch_name
-     FROM invoices i JOIN branches b ON b.id = i.branch_id
-     WHERE i.organization_id = $1
-     ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-    [req.user.organizationId, pageSize, offset]
-  );
-  res.json({ items: r.rows, page, pageSize });
+
+  let scopeFilter = "";
+  const sellerFilter = req.user.role === "seller" ? "AND i.branch_id = $2" : "";
+  const scopeParams = [req.user.organizationId];
+
+  if (req.user.role === "customer") {
+    scopeParams.push(req.user.id);
+    scopeFilter = "AND i.customer_id = $2";
+  }
+
+  if (req.user.role === "seller") {
+    if (!req.user.branchId) {
+      return res.status(403).json({ error: "employee_branch_required" });
+    }
+    scopeParams.push(req.user.branchId);
+    scopeFilter = sellerFilter;
+  }
+
+  const limitPosition = scopeParams.length + 1;
+  const offsetPosition = scopeParams.length + 2;
+
+  try {
+    const [invoiceResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT i.*, b.name AS branch_name
+         FROM invoices i
+         JOIN branches b
+           ON b.id = i.branch_id
+          AND b.organization_id = i.organization_id
+         WHERE i.organization_id = $1
+           ${scopeFilter}
+         ORDER BY i.created_at DESC
+         LIMIT $${limitPosition}
+         OFFSET $${offsetPosition}`,
+        [...scopeParams, pageSize, offset]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::integer AS total
+         FROM invoices i
+         WHERE i.organization_id = $1
+           ${scopeFilter}`,
+        scopeParams
+      ),
+    ]);
+
+    const total = countResult.rows[0]?.total ?? 0;
+
+    return res.json({
+      items: invoiceResult.rows,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  } catch (error) {
+    console.error("Invoice listing failed:", error);
+    return res.status(500).json({ error: "invoice_listing_failed" });
+  }
 });
 
 export default router;

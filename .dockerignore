@@ -1,0 +1,10 @@
+.git
+.github
+**/node_modules
+**/.npm-cache
+**/.env*
+**/dist
+**/coverage
+**/test
+*.log
+*.md

@@ -1,15 +1,20 @@
-import React, { useState } from "react";
-import { searchParts, checkout } from "../api/client.js";
+import React, { useEffect, useState } from "react";
+import { searchParts, checkout, isDevicePaired, pairDevice } from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
-export default function SellerView() {
+export default function SellerView({ user }) {
   const { t } = useLanguage();
   const [q, setQ] = useState("");
+  const [type, setType] = useState("name");
   const [results, setResults] = useState([]);
   const [cart, setCart] = useState([]); // { partId, name, price, quantity }
+  const [paired, setPaired] = useState(false);
+  const [pairingCode, setPairingCode] = useState("");
+
+  useEffect(() => { isDevicePaired().then(setPaired).catch(() => setPaired(false)); }, []);
 
   async function onSearch() {
-    setResults(await searchParts(q, "name"));
+    setResults(await searchParts(q, type));
   }
 
   function addToCart(p) {
@@ -25,9 +30,7 @@ export default function SellerView() {
 
   async function onCheckout() {
     const items = cart.map((c) => ({ partId: c.partId, quantity: c.quantity }));
-    // branchId is taken from the logged-in seller's account on the server side;
-    // passing 1 here is only a fallback used if the account has no branch set.
-    const invoice = await checkout(1, items);
+    const invoice = await checkout(user?.branchId, items);
     if (invoice.error) {
       alert(`${t("error_prefix")}: ${invoice.error}`);
       return;
@@ -37,10 +40,36 @@ export default function SellerView() {
     onSearch();
   }
 
+  async function connectDevice() {
+    const result = await pairDevice(pairingCode.trim());
+    if (result.device) setPaired(true);
+    else alert(result.error || "تعذر ربط الجهاز");
+  }
+
+  if (!paired) {
+    return (
+      <div className="rk-card">
+        <h3>ربط جهاز نقطة البيع</h3>
+        <p>اطلب من مدير المحل إنشاء رمز ربط لهذا الجهاز.</p>
+        <input className="rk-input" maxLength={6} value={pairingCode} onChange={(e) => setPairingCode(e.target.value)} placeholder="رمز الربط المكون من 6 أرقام" />
+        <button className="rk-btn" style={{ marginTop: 10 }} onClick={connectDevice}>ربط الجهاز</button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+    <div>
+      <div className="rk-card" style={{ marginBottom: 12 }}>
+        الموظف المسؤول عن الصرف: <b>{user?.name || "المستخدم المسجل"}</b>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
       <div>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="name">{t("search_by_name")}</option>
+            <option value="pn">{t("search_by_pn")}</option>
+            <option value="vin">{t("search_by_vin")}</option>
+          </select>
           <input className="rk-input" style={{ flex: 1 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("seller_search_placeholder")} />
           <button className="rk-btn" onClick={onSearch}>{t("search_btn")}</button>
         </div>
@@ -89,6 +118,7 @@ export default function SellerView() {
         <button className="rk-btn" style={{ width: "100%", marginTop: 10 }} onClick={onCheckout} disabled={!cart.length}>
           {t("checkout_btn")}
         </button>
+      </div>
       </div>
     </div>
   );
