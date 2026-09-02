@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788091120526,
+      "tag": "0000_cuddly_kylun",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788209669530,
+      "tag": "0001_talented_wither",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788328537429,
+      "tag": "0002_overjoyed_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788329253413,
+      "tag": "0003_robust_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788329678861,
+      "tag": "0004_fat_malcolm_colcord",
+      "breakpoints": true
+    }
+  ]
+}
