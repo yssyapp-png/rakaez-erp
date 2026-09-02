@@ -20,7 +20,8 @@ test("uses the approved gold Rakaez logo in the sidebar and command center", () 
 });
 
 test("keeps the command-center logo right, copy centered, and date left", () => {
-  assert.match(styles, /\.welcome-emblem[^}]*right:30px[^}]*left:auto/);
+  assert.match(styles, /\.welcome-brand-panel[^}]*right:22px/);
+  assert.match(app, /className="welcome-brand-panel"[^]*className="welcome-emblem"[^]*className="welcome-services-art"/);
   assert.match(styles, /\.welcome-copy[^}]*margin-inline:auto[^}]*text-align:center/);
   assert.match(styles, /\.date-block[^}]*left:30px/);
 });
