@@ -62,5 +62,10 @@
     "wrangler": "^4.128.0"
   },
   "type": "module",
-  "displayName": "ركائز لقطع الغيار — المراجعة الداخلية"
+  "displayName": "ركائز لقطع الغيار — المراجعة الداخلية",
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
+  }
 }
