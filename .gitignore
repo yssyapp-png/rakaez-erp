@@ -18,3 +18,4 @@ demo-preview/.*-generation-status
 
 # JetBrains IDE files
 .idea/
+.sites-runtime/
