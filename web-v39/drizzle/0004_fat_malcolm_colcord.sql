@@ -1,0 +1,1 @@
+ALTER TABLE `sales_invoices` ADD `transaction_type` text DEFAULT 'sale' NOT NULL;
