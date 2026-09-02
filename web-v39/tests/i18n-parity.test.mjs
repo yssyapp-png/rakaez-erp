@@ -9,7 +9,7 @@ const i18nSource = await readFile(new URL("../app/i18n.ts", import.meta.url), "u
 const dashboardRoute = await readFile(new URL("../app/api/dashboard/route.ts", import.meta.url), "utf8");
 const catalogRoute = await readFile(new URL("../app/api/catalog/route.ts", import.meta.url), "utf8");
 const root = fileURLToPath(new URL("..", import.meta.url));
-const vite = await createServer({ appType: "custom", configFile: false, root, server: { middlewareMode: true } });
+const vite = await createServer({ appType: "custom", configFile: false, root, server: { middlewareMode: true, hmr: false } });
 
 after(async () => {
   await vite.close();
