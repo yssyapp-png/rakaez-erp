@@ -42,7 +42,7 @@ export default function App() {
   const [tab, setTab] = useState("customer");
   const [user, setUser] = useState(null);
   const { t, lang, toggleLang } = useLanguage();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, resolvedTheme, cycleTheme } = useTheme();
 
   useEffect(() => {
     getCurrentUser()
@@ -89,12 +89,37 @@ export default function App() {
           {user && (
             <button
               type="button"
-              className="rk-theme-toggle"
-              onClick={toggleTheme}
-              title={theme === "light" ? "الوضع الداكن (بني غامق وذهبي)" : "الوضع الفاتح (بني فاتح وذهبي)"}
-              aria-label={theme === "light" ? "تفعيل الوضع الداكن" : "تفعيل الوضع الفاتح"}
+              className={`rk-theme-toggle rk-theme-toggle--${theme}`}
+              onClick={cycleTheme}
+              title={
+                theme === "light"
+                  ? (lang === "ar" ? "الوضع النهاري — اضغط للوضع الليلي" : "Light mode — switch to dark")
+                  : theme === "dark"
+                    ? (lang === "ar" ? "الوضع الليلي — اضغط للوضع التلقائي" : "Dark mode — switch to automatic")
+                    : (
+                        lang === "ar"
+                          ? `الوضع التلقائي — يتبع الجهاز (${resolvedTheme === "dark" ? "ليلي" : "نهاري"})`
+                          : `Automatic mode — follows device (${resolvedTheme})`
+                      )
+              }
+              aria-label={
+                theme === "light"
+                  ? "Light theme"
+                  : theme === "dark"
+                    ? "Dark theme"
+                    : "Automatic theme"
+              }
             >
-              {theme === "light" ? "🌙" : "☀️"}
+              <span className="rk-theme-icon" aria-hidden="true">
+                {theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "◐"}
+              </span>
+              <span className="rk-theme-label">
+                {theme === "light"
+                  ? (lang === "ar" ? "نهاري" : "Light")
+                  : theme === "dark"
+                    ? (lang === "ar" ? "ليلي" : "Dark")
+                    : (lang === "ar" ? "تلقائي" : "Auto")}
+              </span>
             </button>
           )}
           <button type="button" className="rk-theme-toggle" onClick={toggleLang} title={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}>

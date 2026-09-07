@@ -515,3 +515,73 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+
+/* Rakaez appearance selector */
+.rk-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.48);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--rakaez-text-on-header);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.rk-theme-toggle:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+  border-color: var(--rakaez-gold-bright);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.rk-theme-toggle:active {
+  transform: translateY(0);
+}
+
+.rk-theme-toggle:focus-visible {
+  outline: 2px solid var(--rakaez-gold-bright);
+  outline-offset: 2px;
+}
+
+.rk-theme-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.rk-theme-label {
+  white-space: nowrap;
+}
+
+.rk-theme-toggle--system .rk-theme-icon {
+  font-size: 18px;
+}
+
+@media (max-width: 720px) {
+  .rk-theme-label {
+    display: none;
+  }
+
+  .rk-theme-toggle {
+    width: 38px;
+    min-width: 38px;
+    padding-inline: 0;
+  }
+}

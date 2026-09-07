@@ -1,42 +1,120 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-/**
- * Switches the brand palette between "light" (brown/cream, the current
- * default) and "dark" (near-black brown + gold, matching the reference
- * mockup the shop owner sent). Both palettes are defined in theme.css under
- * [data-theme="light"|"dark"] — this context just flips the attribute on
- * <html> and remembers the choice, the same pattern as LanguageContext.
- */
 const STORAGE_KEY = "rakaez_visual_theme";
 const ThemeContext = createContext(null);
 
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) === "dark" ? "dark" : "light";
-    } catch {
-      return "light";
+function getSystemTheme() {
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+  return "light";
+}
+
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (saved === "light" || saved === "dark" || saved === "system") {
+      return saved;
     }
-  });
+  } catch {
+    // Ignore storage errors and use system mode.
+  }
+
+  return "system";
+}
+
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState(getInitialTheme);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+
+  const resolvedTheme = theme === "system" ? systemTheme : theme;
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const handleSystemChange = (event) => {
+      setSystemTheme(event.matches ? "dark" : "light");
+    };
+
+    setSystemTheme(media.matches ? "dark" : "light");
+
+    if (media.addEventListener) {
+      media.addEventListener("change", handleSystemChange);
+    } else {
+      media.addListener(handleSystemChange);
+    }
+
+    return () => {
+      if (media.removeEventListener) {
+        media.removeEventListener("change", handleSystemChange);
+      } else {
+        media.removeListener(handleSystemChange);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+    document.documentElement.setAttribute("data-theme-mode", theme);
+
+    document.documentElement.style.colorScheme = resolvedTheme;
+
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
-      // ignore (e.g. private browsing storage restrictions)
+      // Theme still works if localStorage is unavailable.
     }
-  }, [theme]);
+  }, [theme, resolvedTheme]);
 
-  function toggleTheme() {
-    setTheme((th) => (th === "light" ? "dark" : "light"));
+  function setThemeMode(mode) {
+    if (!["light", "dark", "system"].includes(mode)) return;
+    setTheme(mode);
   }
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  function cycleTheme() {
+    setTheme((current) => {
+      if (current === "light") return "dark";
+      if (current === "dark") return "system";
+      return "light";
+    });
+  }
+
+  const value = useMemo(
+    () => ({
+      theme,
+      resolvedTheme,
+      systemTheme,
+      setTheme: setThemeMode,
+      setThemeMode,
+      cycleTheme,
+      toggleTheme: cycleTheme,
+    }),
+    [theme, resolvedTheme, systemTheme]
+  );
+
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {
   const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error("useTheme must be used inside <ThemeProvider>");
+
+  if (!ctx) {
+    throw new Error("useTheme must be used inside <ThemeProvider>");
+  }
+
   return ctx;
 }
