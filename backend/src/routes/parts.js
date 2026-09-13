@@ -154,6 +154,32 @@ const CUSTOMER_PART_COLUMNS = `p.id, p.part_number, p.name, p.brand, p.category,
 const STAFF_PART_COLUMNS = `${CUSTOMER_PART_COLUMNS}, p.cost, p.catalog_status,
   p.catalog_source, p.catalog_key`;
 
+function normalizeCatalogCodes(value) {
+  if (value == null) return undefined;
+
+  const source = Array.isArray(value)
+    ? value
+    : String(value).split(/[;,\n]+/);
+
+  const items = [...new Set(
+    source
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+  )];
+
+  if (items.length > 50) return null;
+  if (items.some((item) => item.length > 120)) return null;
+
+  return items;
+}
+
+function normalizeCatalogText(value, maxLength) {
+  if (value == null) return undefined;
+  const text = String(value).trim();
+  if (text.length > maxLength) return null;
+  return text || null;
+}
+
 /**
  * GET /api/parts/search?q=...&type=name|pn|vin
  * Unified search used by the customer app and the seller/POS screen.
@@ -166,16 +192,23 @@ router.get("/search", async (req, res) => {
   if (!["customer", "seller", "warehouse_keeper", "admin"].includes(req.user.role)) {
     return res.status(403).json({ error: "forbidden" });
   }
-  const { q = "", type = "name" } = req.query;
+  const { q = "", type = "all" } = req.query;
   const searchTerm = String(q).trim();
+  const searchType = String(type || "all").trim().toLowerCase();
+  const allowedSearchTypes = new Set(["all", "name", "pn", "barcode", "oem", "vin"]);
+
   if (!searchTerm) return res.status(400).json({ error: "search_required" });
   if (searchTerm.length > 120) return res.status(400).json({ error: "search_too_long" });
+  if (!allowedSearchTypes.has(searchType)) {
+    return res.status(400).json({ error: "invalid_search_type" });
+  }
+
   const orgId = req.user.organizationId;
   const isCustomer = req.user.role === "customer";
   const partColumns = req.user.role === "admin" ? STAFF_PART_COLUMNS : CUSTOMER_PART_COLUMNS;
   try {
     let rows;
-    if (type === "pn") {
+    if (searchType === "pn") {
       const r = await pool.query(
         `SELECT ${partColumns} FROM parts p
          WHERE p.organization_id = $1 AND p.catalog_status = 'active' AND p.part_number ILIKE $2
@@ -183,7 +216,40 @@ router.get("/search", async (req, res) => {
         [orgId, `%${searchTerm}%`]
       );
       rows = r.rows;
-    } else if (type === "vin") {
+    } else if (searchType === "barcode") {
+      const r = await pool.query(
+        `SELECT ${partColumns} FROM parts p
+         WHERE p.organization_id = $1
+           AND p.catalog_status = 'active'
+           AND p.barcode = $2
+         ORDER BY p.name
+         LIMIT 100`,
+        [orgId, searchTerm]
+      );
+      rows = r.rows;
+    } else if (searchType === "oem") {
+      const r = await pool.query(
+        `SELECT ${partColumns} FROM parts p
+         WHERE p.organization_id = $1
+           AND p.catalog_status = 'active'
+           AND EXISTS (
+             SELECT 1
+             FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS code
+             WHERE code ILIKE $2
+           )
+         ORDER BY CASE
+           WHEN EXISTS (
+             SELECT 1
+             FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS exact_code
+             WHERE upper(exact_code) = upper($3)
+           ) THEN 0
+           ELSE 1
+         END, p.name
+         LIMIT 100`,
+        [orgId, `%${searchTerm}%`, searchTerm]
+      );
+      rows = r.rows;
+    } else if (searchType === "vin") {
       const vin = normalizeVin(searchTerm);
       if (!vin) return res.status(400).json({ error: "invalid_vin" });
       const ownerFilter = req.user.role === "customer" ? "AND cv.user_id = $3" : "";
@@ -212,12 +278,43 @@ router.get("/search", async (req, res) => {
     } else {
       const r = await pool.query(
         `SELECT ${partColumns} FROM parts p
-         WHERE p.organization_id = $1 AND p.catalog_status = 'active'
-           AND (p.name ILIKE $2 OR p.brand ILIKE $2 OR p.category ILIKE $2
-             OR p.part_number ILIKE $2 OR p.barcode ILIKE $2
-             OR EXISTS (SELECT 1 FROM unnest(p.oem_numbers || p.cross_reference_numbers) n WHERE n ILIKE $2))
-         ORDER BY p.name LIMIT 100`,
-        [orgId, `%${searchTerm}%`]
+         WHERE p.organization_id = $1
+           AND p.catalog_status = 'active'
+           AND (
+             ($3 = 'name' AND (
+               p.name ILIKE $2
+               OR coalesce(p.brand, '') ILIKE $2
+               OR coalesce(p.category, '') ILIKE $2
+               OR coalesce(p.manufacturer, '') ILIKE $2
+             ))
+             OR
+             ($3 = 'all' AND (
+               p.name ILIKE $2
+               OR coalesce(p.brand, '') ILIKE $2
+               OR coalesce(p.category, '') ILIKE $2
+               OR coalesce(p.manufacturer, '') ILIKE $2
+               OR p.part_number ILIKE $2
+               OR coalesce(p.barcode, '') ILIKE $2
+               OR EXISTS (
+                 SELECT 1
+                 FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS code
+                 WHERE code ILIKE $2
+               )
+             ))
+           )
+         ORDER BY CASE
+           WHEN upper(p.part_number) = upper($4)
+             OR upper(coalesce(p.barcode, '')) = upper($4)
+           THEN 0
+           WHEN EXISTS (
+             SELECT 1
+             FROM unnest(p.oem_numbers || p.cross_reference_numbers) AS exact_code
+             WHERE upper(exact_code) = upper($4)
+           ) THEN 1
+           ELSE 2
+         END, p.name
+         LIMIT 100`,
+        [orgId, `%${searchTerm}%`, searchType, searchTerm]
       );
       rows = r.rows;
     }
@@ -621,15 +718,98 @@ router.get("/warehouse-low-stock", deviceRequired, async (req, res) => {
  */
 router.post("/", requireRole("admin"), async (req, res) => {
   const orgId = req.user.organizationId;
-  const { partNumber, name, brand, category, price, cost, branchId, quantity, minQuantity } = req.body;
+  const {
+    partNumber,
+    name,
+    brand,
+    category,
+    price,
+    cost,
+    branchId,
+    quantity,
+    minQuantity,
+    barcode,
+    manufacturer,
+    oemNumbers,
+    crossReferenceNumbers,
+    unit,
+    qualityGrade,
+    countryOfOrigin,
+    warrantyMonths,
+    catalogStatus,
+  } = req.body;
+
   if (!partNumber || !name || price == null) {
     return res.status(400).json({ error: "missing_fields" });
   }
+
   if (!isNonNegativeMoney(price) || Number(price) <= 0 || !isNonNegativeMoney(cost ?? 0)) {
     return res.status(400).json({ error: "invalid_price" });
   }
+
   if (!isNonNegativeInteger(quantity ?? 0) || !isNonNegativeInteger(minQuantity ?? 5)) {
     return res.status(400).json({ error: "invalid_quantity" });
+  }
+
+  if (catalogStatus != null && !["draft", "active", "archived"].includes(catalogStatus)) {
+    return res.status(400).json({ error: "invalid_catalog_status" });
+  }
+
+  const normalizedOemNumbers = normalizeCatalogCodes(oemNumbers);
+  const normalizedCrossReferences = normalizeCatalogCodes(crossReferenceNumbers);
+  const normalizedBarcode = normalizeCatalogText(barcode, 120);
+  const normalizedManufacturer = normalizeCatalogText(manufacturer, 120);
+  const normalizedUnit = normalizeCatalogText(unit, 40);
+  const normalizedQualityGrade = normalizeCatalogText(qualityGrade, 60);
+  const normalizedCountryOfOrigin = normalizeCatalogText(countryOfOrigin, 100);
+
+  if (oemNumbers != null && normalizedOemNumbers === null) {
+    return res.status(400).json({ error: "invalid_oem_numbers" });
+  }
+
+  if (crossReferenceNumbers != null && normalizedCrossReferences === null) {
+    return res.status(400).json({ error: "invalid_cross_reference_numbers" });
+  }
+
+  if (barcode != null && normalizedBarcode === null && String(barcode).trim().length > 120) {
+    return res.status(400).json({ error: "invalid_barcode" });
+  }
+
+  if (
+    manufacturer != null &&
+    normalizedManufacturer === null &&
+    String(manufacturer).trim().length > 120
+  ) {
+    return res.status(400).json({ error: "invalid_manufacturer" });
+  }
+
+  if (unit != null && normalizedUnit === null && String(unit).trim().length > 40) {
+    return res.status(400).json({ error: "invalid_unit" });
+  }
+
+  if (
+    qualityGrade != null &&
+    normalizedQualityGrade === null &&
+    String(qualityGrade).trim().length > 60
+  ) {
+    return res.status(400).json({ error: "invalid_quality_grade" });
+  }
+
+  if (
+    countryOfOrigin != null &&
+    normalizedCountryOfOrigin === null &&
+    String(countryOfOrigin).trim().length > 100
+  ) {
+    return res.status(400).json({ error: "invalid_country_of_origin" });
+  }
+
+  if (
+    warrantyMonths != null &&
+    (!Number.isInteger(Number(warrantyMonths)) ||
+      Number(warrantyMonths) < 0 ||
+      Number(warrantyMonths) > 240)
+  ) {
+    return res.status(400).json({ error: "invalid_warranty_months" });
   }
   const client = await pool.connect();
   try {
@@ -639,9 +819,47 @@ router.post("/", requireRole("admin"), async (req, res) => {
       return res.status(404).json({ error: "branch_not_found" });
     }
     const partRes = await client.query(
-      `INSERT INTO parts (organization_id, part_number, name, brand, category, price, cost)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [orgId, partNumber, name, brand || null, category || null, price, cost || 0]
+      `INSERT INTO parts (
+         organization_id,
+         part_number,
+         name,
+         brand,
+         category,
+         price,
+         cost,
+         barcode,
+         manufacturer,
+         oem_numbers,
+         cross_reference_numbers,
+         unit,
+         quality_grade,
+         country_of_origin,
+         warranty_months,
+         catalog_status
+       )
+       VALUES (
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::text[],$11::text[],
+         $12,$13,$14,$15,$16
+       )
+       RETURNING *`,
+      [
+        orgId,
+        String(partNumber).trim(),
+        String(name).trim(),
+        brand ? String(brand).trim() : null,
+        category ? String(category).trim() : null,
+        price,
+        cost ?? 0,
+        normalizedBarcode,
+        normalizedManufacturer,
+        normalizedOemNumbers ?? [],
+        normalizedCrossReferences ?? [],
+        normalizedUnit,
+        normalizedQualityGrade,
+        normalizedCountryOfOrigin,
+        warrantyMonths == null || warrantyMonths === "" ? null : Number(warrantyMonths),
+        catalogStatus || "active",
+      ]
     );
     const part = partRes.rows[0];
 
@@ -678,23 +896,83 @@ router.post("/", requireRole("admin"), async (req, res) => {
  * :id here is the numeric primary key (not the shop-facing part_number).
  */
 router.put("/:id", requireRole("admin"), async (req, res) => {
-  const { name, brand, category, price, cost, barcode, manufacturer, catalogStatus } = req.body;
+  const {
+    name,
+    brand,
+    category,
+    price,
+    cost,
+    barcode,
+    manufacturer,
+    oemNumbers,
+    crossReferenceNumbers,
+    unit,
+    qualityGrade,
+    countryOfOrigin,
+    warrantyMonths,
+    catalogStatus,
+  } = req.body;
+
   if ((price != null && !isNonNegativeMoney(price)) || (cost != null && !isNonNegativeMoney(cost))) {
     return res.status(400).json({ error: "invalid_price" });
   }
+
   if (catalogStatus != null && !["draft", "active", "archived"].includes(catalogStatus)) {
     return res.status(400).json({ error: "invalid_catalog_status" });
   }
+
+  const normalizedOemNumbers = normalizeCatalogCodes(oemNumbers);
+  const normalizedCrossReferences = normalizeCatalogCodes(crossReferenceNumbers);
+  const normalizedUnit = normalizeCatalogText(unit, 40);
+  const normalizedQualityGrade = normalizeCatalogText(qualityGrade, 60);
+  const normalizedCountryOfOrigin = normalizeCatalogText(countryOfOrigin, 100);
+
+  if (oemNumbers != null && normalizedOemNumbers === null) {
+    return res.status(400).json({ error: "invalid_oem_numbers" });
+  }
+
+  if (crossReferenceNumbers != null && normalizedCrossReferences === null) {
+    return res.status(400).json({ error: "invalid_cross_reference_numbers" });
+  }
+
+  if (unit != null && normalizedUnit === null && String(unit).trim().length > 40) {
+    return res.status(400).json({ error: "invalid_unit" });
+  }
+
+  if (qualityGrade != null && normalizedQualityGrade === null && String(qualityGrade).trim().length > 60) {
+    return res.status(400).json({ error: "invalid_quality_grade" });
+  }
+
+  if (
+    countryOfOrigin != null &&
+    normalizedCountryOfOrigin === null &&
+    String(countryOfOrigin).trim().length > 100
+  ) {
+    return res.status(400).json({ error: "invalid_country_of_origin" });
+  }
+
+  if (
+    warrantyMonths != null &&
+    (!Number.isInteger(Number(warrantyMonths)) ||
+      Number(warrantyMonths) < 0 ||
+      Number(warrantyMonths) > 240)
+  ) {
+    return res.status(400).json({ error: "invalid_warranty_months" });
+  }
+
   if (catalogStatus === "active") {
     const current = await pool.query(
       "SELECT price FROM parts WHERE id = $1 AND organization_id = $2",
       [req.params.id, req.user.organizationId]
     );
+
     const effectivePrice = price ?? current.rows[0]?.price;
+
     if (!current.rows[0] || Number(effectivePrice) <= 0) {
       return res.status(400).json({ error: "positive_price_required_for_activation" });
     }
   }
+
   const r = await pool.query(
     `UPDATE parts SET
        name = COALESCE($1, name),
@@ -702,13 +980,46 @@ router.put("/:id", requireRole("admin"), async (req, res) => {
        category = COALESCE($3, category),
        price = COALESCE($4, price),
        cost = COALESCE($5, cost),
-       barcode = COALESCE($6, barcode),
-       manufacturer = COALESCE($7, manufacturer),
-       catalog_status = COALESCE($8, catalog_status)
-     WHERE id = $9 AND organization_id = $10 RETURNING *`,
-    [name, brand, category, price, cost, barcode, manufacturer, catalogStatus, req.params.id, req.user.organizationId]
+       barcode = CASE WHEN $6::boolean THEN $7 ELSE barcode END,
+       manufacturer = CASE WHEN $8::boolean THEN $9 ELSE manufacturer END,
+       oem_numbers = COALESCE($10::text[], oem_numbers),
+       cross_reference_numbers = COALESCE($11::text[], cross_reference_numbers),
+       unit = CASE WHEN $12::boolean THEN $13 ELSE unit END,
+       quality_grade = CASE WHEN $14::boolean THEN $15 ELSE quality_grade END,
+       country_of_origin = CASE WHEN $16::boolean THEN $17 ELSE country_of_origin END,
+       warranty_months = CASE WHEN $18::boolean THEN $19 ELSE warranty_months END,
+       catalog_status = COALESCE($20, catalog_status)
+     WHERE id = $21
+       AND organization_id = $22
+     RETURNING *`,
+    [
+      name,
+      brand,
+      category,
+      price,
+      cost,
+      barcode !== undefined,
+      barcode == null ? null : String(barcode).trim() || null,
+      manufacturer !== undefined,
+      manufacturer == null ? null : String(manufacturer).trim() || null,
+      normalizedOemNumbers,
+      normalizedCrossReferences,
+      unit !== undefined,
+      normalizedUnit,
+      qualityGrade !== undefined,
+      normalizedQualityGrade,
+      countryOfOrigin !== undefined,
+      normalizedCountryOfOrigin,
+      warrantyMonths !== undefined,
+      warrantyMonths == null || warrantyMonths === "" ? null : Number(warrantyMonths),
+      catalogStatus,
+      req.params.id,
+      req.user.organizationId,
+    ]
   );
+
   if (!r.rows[0]) return res.status(404).json({ error: "not_found" });
+
   res.json(r.rows[0]);
 });
 

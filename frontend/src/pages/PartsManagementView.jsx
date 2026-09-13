@@ -8,6 +8,10 @@ import {
   getBranchesSummary,
   previewPartsImport,
   commitPartsImport,
+  getPartApplications,
+  createPartApplication,
+  updatePartApplicationStatus,
+  deletePartApplication,
 } from "../api/client.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
@@ -24,6 +28,7 @@ export default function PartsManagementView() {
   const [editing, setEditing] = useState(null); // part being edited, or "new"
   const [message, setMessage] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [applicationsPart, setApplicationsPart] = useState(null);
 
   function refresh() {
     getAllParts().then(setParts);
@@ -40,6 +45,20 @@ export default function PartsManagementView() {
       category: form.category,
       price: Number(form.price),
       cost: Number(form.cost || 0),
+      barcode: form.barcode,
+      manufacturer: form.manufacturer,
+      oemNumbers: form.oemNumbers
+        .split(/[;,\n]+/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+      crossReferenceNumbers: form.crossReferenceNumbers
+        .split(/[;,\n]+/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+      unit: form.unit,
+      qualityGrade: form.qualityGrade,
+      countryOfOrigin: form.countryOfOrigin,
+      warrantyMonths: form.warrantyMonths === "" ? null : Number(form.warrantyMonths),
       branchId: form.branchId || undefined,
       quantity: Number(form.quantity || 0),
       minQuantity: Number(form.minQuantity || 5),
@@ -154,7 +173,18 @@ export default function PartsManagementView() {
                 ))}
               </td>
               <td style={{ padding: 8 }}>
-                {part.catalog_status === "draft" && <button className="rk-btn-outline" onClick={() => onActivate(part)}>تفعيل</button>}
+                {part.catalog_status === "draft" && (
+                  <button className="rk-btn-outline" onClick={() => onActivate(part)}>
+                    تفعيل
+                  </button>
+                )}
+                <button
+                  className="rk-btn-outline"
+                  style={{ marginInlineEnd: 8 }}
+                  onClick={() => setApplicationsPart(part)}
+                >
+                  توافق السيارات
+                </button>
                 <a style={{ cursor: "pointer", color: "#3b82f6", marginInlineEnd: 8 }} onClick={() => setEditing(part)}>
                   {t("edit")}
                 </a>
@@ -167,6 +197,15 @@ export default function PartsManagementView() {
         </tbody>
       </table>
       {parts.length === 0 && <p style={{ color: "#777", marginTop: 20 }}>{t("no_parts_yet")}</p>}
+
+      {applicationsPart && (
+        <VehicleApplicationsPanel
+          part={applicationsPart}
+          onClose={() => setApplicationsPart(null)}
+          onMessage={setMessage}
+          t={t}
+        />
+      )}
     </div>
   );
 }
@@ -306,6 +345,225 @@ function PartsImportPanel({ branches, onImported }) {
   );
 }
 
+function VehicleApplicationsPanel({ part, onClose, onMessage, t }) {
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    make: "",
+    model: "",
+    yearFrom: "",
+    yearTo: "",
+    engine: "",
+    trim: "",
+  });
+
+  async function refreshApplications() {
+    const result = await getPartApplications(part.id);
+    setItems(Array.isArray(result) ? result : []);
+  }
+
+  useEffect(() => {
+    refreshApplications();
+  }, [part.id]);
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  function set(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function addApplication() {
+    setBusy(true);
+    const result = await createPartApplication(part.id, {
+      make: form.make,
+      model: form.model,
+      yearFrom: form.yearFrom === "" ? null : Number(form.yearFrom),
+      yearTo: form.yearTo === "" ? null : Number(form.yearTo),
+      engine: form.engine,
+      trim: form.trim,
+    });
+    setBusy(false);
+
+    if (result.error) {
+      onMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    setForm({
+      make: "",
+      model: "",
+      yearFrom: "",
+      yearTo: "",
+      engine: "",
+      trim: "",
+    });
+
+    onMessage({ type: "success", text: t("catalog_compatibility_added") });
+    refreshApplications();
+  }
+
+  async function changeStatus(id, status) {
+    const result = await updatePartApplicationStatus(id, status);
+    if (result.error) {
+      onMessage({ type: "error", text: result.error });
+      return;
+    }
+    refreshApplications();
+  }
+
+  async function removeApplication(id) {
+    const result = await deletePartApplication(id);
+    if (result.error) {
+      onMessage({ type: "error", text: result.error });
+      return;
+    }
+    refreshApplications();
+  }
+
+  function statusLabel(status) {
+    if (status === "verified") return t("catalog_verified");
+    if (status === "rejected") return t("catalog_rejected");
+    return t("catalog_pending_review");
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,.35)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="rk-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("catalog_vehicle_compatibility")}
+        style={{
+          width: "min(980px, 96vw)",
+          maxHeight: "88vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>{t("catalog_vehicle_compatibility")}</h3>
+            <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
+              {part.part_number} — {part.name}
+            </div>
+          </div>
+          <button className="rk-btn-outline" onClick={onClose}>{t("catalog_close")}</button>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+            gap: 10,
+            marginTop: 18,
+          }}
+        >
+          <input className="rk-input" placeholder={t("catalog_make")} value={form.make} onChange={(e) => set("make", e.target.value)} />
+          <input className="rk-input" placeholder={t("catalog_model")} value={form.model} onChange={(e) => set("model", e.target.value)} />
+          <input className="rk-input" type="number" placeholder={t("catalog_year_from")} value={form.yearFrom} onChange={(e) => set("yearFrom", e.target.value)} />
+          <input className="rk-input" type="number" placeholder={t("catalog_year_to")} value={form.yearTo} onChange={(e) => set("yearTo", e.target.value)} />
+          <input className="rk-input" placeholder={t("catalog_engine")} value={form.engine} onChange={(e) => set("engine", e.target.value)} />
+          <input className="rk-input" placeholder={t("catalog_trim")} value={form.trim} onChange={(e) => set("trim", e.target.value)} />
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <button className="rk-btn" disabled={busy || !form.make.trim() || !form.model.trim()} onClick={addApplication}>
+            {busy ? t("catalog_saving") : t("catalog_add_compatibility")}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 20, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #ddd", textAlign: "right" }}>
+                <th style={{ padding: 8 }}>الشركة</th>
+                <th style={{ padding: 8 }}>الموديل</th>
+                <th style={{ padding: 8 }}>السنوات</th>
+                <th style={{ padding: 8 }}>المحرك</th>
+                <th style={{ padding: 8 }}>الفئة</th>
+                <th style={{ padding: 8 }}>الحالة</th>
+                <th style={{ padding: 8 }}>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} style={{ borderBottom: "1px solid #eee" }}>
+                  <td style={{ padding: 8 }}>{item.make}</td>
+                  <td style={{ padding: 8 }}>{item.model}</td>
+                  <td style={{ padding: 8 }}>
+                    {item.year_from ?? "—"} — {item.year_to ?? "—"}
+                  </td>
+                  <td style={{ padding: 8 }}>{item.engine || "—"}</td>
+                  <td style={{ padding: 8 }}>{item.trim || "—"}</td>
+                  <td style={{ padding: 8 }}>{statusLabel(item.verification_status)}</td>
+                  <td style={{ padding: 8, whiteSpace: "nowrap" }}>
+                    {item.verification_status !== "verified" && (
+                      <button className="rk-btn-outline" onClick={() => changeStatus(item.id, "verified")}>
+                        اعتماد
+                      </button>
+                    )}
+                    {item.verification_status !== "rejected" && (
+                      <button
+                        className="rk-btn-outline"
+                        style={{ marginInlineStart: 6 }}
+                        onClick={() => changeStatus(item.id, "rejected")}
+                      >
+                        رفض
+                      </button>
+                    )}
+                    {item.verification_status !== "unverified" && (
+                      <button
+                        className="rk-btn-outline"
+                        style={{ marginInlineStart: 6 }}
+                        onClick={() => changeStatus(item.id, "unverified")}
+                      >
+                        إعادة للمراجعة
+                      </button>
+                    )}
+                    <button
+                      className="rk-btn-outline"
+                      style={{ marginInlineStart: 6 }}
+                      onClick={() => removeApplication(item.id)}
+                    >
+                      حذف
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {items.length === 0 && (
+            <div style={{ padding: 16, opacity: 0.7 }}>
+              {t("catalog_no_compatibilities")}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PartForm({ initial, branches, onCancel, onSave, t }) {
   const [form, setForm] = useState({
     partNumber: initial?.part_number || "",
@@ -314,6 +572,16 @@ function PartForm({ initial, branches, onCancel, onSave, t }) {
     category: initial?.category || "",
     price: initial?.price || "",
     cost: initial?.cost || "",
+    barcode: initial?.barcode || "",
+    manufacturer: initial?.manufacturer || "",
+    oemNumbers: Array.isArray(initial?.oem_numbers) ? initial.oem_numbers.join("\n") : "",
+    crossReferenceNumbers: Array.isArray(initial?.cross_reference_numbers)
+      ? initial.cross_reference_numbers.join("\n")
+      : "",
+    unit: initial?.unit || "",
+    qualityGrade: initial?.quality_grade || "",
+    countryOfOrigin: initial?.country_of_origin || "",
+    warrantyMonths: initial?.warranty_months ?? "",
     branchId: branches[0]?.id || "",
     quantity: 0,
     minQuantity: 5,
@@ -330,8 +598,28 @@ function PartForm({ initial, branches, onCancel, onSave, t }) {
         <input className="rk-input" placeholder={t("ph_name")} value={form.name} onChange={(e) => set("name", e.target.value)} />
         <input className="rk-input" placeholder={t("ph_brand")} value={form.brand} onChange={(e) => set("brand", e.target.value)} />
         <input className="rk-input" placeholder={t("ph_category")} value={form.category} onChange={(e) => set("category", e.target.value)} />
+        <input className="rk-input" placeholder={t("catalog_barcode")} value={form.barcode} onChange={(e) => set("barcode", e.target.value)} />
+        <input className="rk-input" placeholder={t("catalog_manufacturer")} value={form.manufacturer} onChange={(e) => set("manufacturer", e.target.value)} />
         <input className="rk-input" placeholder={t("ph_price")} type="number" value={form.price} onChange={(e) => set("price", e.target.value)} />
         <input className="rk-input" placeholder={t("ph_cost")} type="number" value={form.cost} onChange={(e) => set("cost", e.target.value)} />
+        <input className="rk-input" placeholder={t("catalog_unit")} value={form.unit} onChange={(e) => set("unit", e.target.value)} />
+        <input className="rk-input" placeholder={t("catalog_quality_grade")} value={form.qualityGrade} onChange={(e) => set("qualityGrade", e.target.value)} />
+        <input className="rk-input" placeholder={t("catalog_country_origin")} value={form.countryOfOrigin} onChange={(e) => set("countryOfOrigin", e.target.value)} />
+        <input className="rk-input" placeholder={t("catalog_warranty_months")} type="number" min="0" max="240" value={form.warrantyMonths} onChange={(e) => set("warrantyMonths", e.target.value)} />
+        <textarea
+          className="rk-input"
+          placeholder={t("catalog_oem_numbers")}
+          value={form.oemNumbers}
+          onChange={(e) => set("oemNumbers", e.target.value)}
+          rows="4"
+        />
+        <textarea
+          className="rk-input"
+          placeholder={t("catalog_cross_references")}
+          value={form.crossReferenceNumbers}
+          onChange={(e) => set("crossReferenceNumbers", e.target.value)}
+          rows="4"
+        />
         {!initial && (
           <>
             <select className="rk-select" value={form.branchId} onChange={(e) => set("branchId", e.target.value)}>

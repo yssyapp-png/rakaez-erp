@@ -1,0 +1,3321 @@
+[
+  {
+    "make": "alfa-romeo",
+    "code": "4c-spider",
+    "nameEn": "4C Spider",
+    "nameAr": "4C سبايدر",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "service_supported"
+  },
+  {
+    "make": "alfa-romeo",
+    "code": "brera",
+    "nameEn": "Brera",
+    "nameAr": "بريرا",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "service_supported"
+  },
+  {
+    "make": "alfa-romeo",
+    "code": "giulia",
+    "nameEn": "Giulia",
+    "nameAr": "جوليا",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "alfa-romeo",
+    "code": "giulietta",
+    "nameEn": "Giulietta",
+    "nameAr": "جوليتا",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "service_supported"
+  },
+  {
+    "make": "alfa-romeo",
+    "code": "mito",
+    "nameEn": "MiTo",
+    "nameAr": "ميتو",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "service_supported"
+  },
+  {
+    "make": "alfa-romeo",
+    "code": "stelvio",
+    "nameEn": "Stelvio",
+    "nameAr": "ستيلفيو",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "alfa-romeo",
+    "code": "tonale",
+    "nameEn": "Tonale",
+    "nameAr": "تونالي",
+    "market": "SA",
+    "status": "verified",
+    "source": "alfa-romeo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "aston-martin",
+    "code": "db12",
+    "nameEn": "DB12",
+    "nameAr": "DB12",
+    "market": "SA",
+    "status": "verified",
+    "source": "aston-martin-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "aston-martin",
+    "code": "dbx",
+    "nameEn": "DBX",
+    "nameAr": "DBX",
+    "market": "SA",
+    "status": "verified",
+    "source": "aston-martin-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "aston-martin",
+    "code": "valhalla",
+    "nameEn": "Valhalla",
+    "nameAr": "فالهالا",
+    "market": "SA",
+    "status": "verified",
+    "source": "aston-martin-sa",
+    "sourceType": "limited_current"
+  },
+  {
+    "make": "aston-martin",
+    "code": "vanquish",
+    "nameEn": "Vanquish",
+    "nameAr": "فانكويش",
+    "market": "SA",
+    "status": "verified",
+    "source": "aston-martin-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "aston-martin",
+    "code": "vantage",
+    "nameEn": "Vantage",
+    "nameAr": "فانتاج",
+    "market": "SA",
+    "status": "verified",
+    "source": "aston-martin-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "a3",
+    "nameEn": "A3",
+    "nameAr": "A3",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "a5",
+    "nameEn": "A5",
+    "nameAr": "A5",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "a6",
+    "nameEn": "A6",
+    "nameAr": "A6",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "a8",
+    "nameEn": "A8",
+    "nameAr": "A8",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "e-tron-gt",
+    "nameEn": "e-tron GT",
+    "nameAr": "e-tron GT",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "q2",
+    "nameEn": "Q2",
+    "nameAr": "Q2",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "q3",
+    "nameEn": "Q3",
+    "nameAr": "Q3",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "q5",
+    "nameEn": "Q5",
+    "nameAr": "Q5",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "q7",
+    "nameEn": "Q7",
+    "nameAr": "Q7",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "q8",
+    "nameEn": "Q8",
+    "nameAr": "Q8",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "audi",
+    "code": "q9",
+    "nameEn": "Q9",
+    "nameAr": "Q9",
+    "market": "SA",
+    "status": "verified",
+    "source": "audi-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bentley",
+    "code": "bentayga",
+    "nameEn": "Bentayga",
+    "nameAr": "بنتايجا",
+    "market": "SA",
+    "status": "verified",
+    "source": "bentley-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bentley",
+    "code": "continental-gt",
+    "nameEn": "Continental GT",
+    "nameAr": "كونتيننتال GT",
+    "market": "SA",
+    "status": "verified",
+    "source": "bentley-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bentley",
+    "code": "continental-gtc",
+    "nameEn": "Continental GTC",
+    "nameAr": "كونتيننتال GTC",
+    "market": "SA",
+    "status": "verified",
+    "source": "bentley-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bentley",
+    "code": "flying-spur",
+    "nameEn": "Flying Spur",
+    "nameAr": "فلاينج سبير",
+    "market": "SA",
+    "status": "verified",
+    "source": "bentley-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "1-series",
+    "nameEn": "1 Series",
+    "nameAr": "الفئة الأولى",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "2-series",
+    "nameEn": "2 Series",
+    "nameAr": "الفئة الثانية",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "3-series",
+    "nameEn": "3 Series",
+    "nameAr": "الفئة الثالثة",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "4-series",
+    "nameEn": "4 Series",
+    "nameAr": "الفئة الرابعة",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "5-series",
+    "nameEn": "5 Series",
+    "nameAr": "الفئة الخامسة",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "7-series",
+    "nameEn": "7 Series",
+    "nameAr": "الفئة السابعة",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "8-series",
+    "nameEn": "8 Series",
+    "nameAr": "الفئة الثامنة",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "i4",
+    "nameEn": "i4",
+    "nameAr": "i4",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "i5",
+    "nameEn": "i5",
+    "nameAr": "i5",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "i7",
+    "nameEn": "i7",
+    "nameAr": "i7",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "ix",
+    "nameEn": "iX",
+    "nameAr": "iX",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "ix1",
+    "nameEn": "iX1",
+    "nameAr": "iX1",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x1",
+    "nameEn": "X1",
+    "nameAr": "X1",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x2",
+    "nameEn": "X2",
+    "nameAr": "X2",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x3",
+    "nameEn": "X3",
+    "nameAr": "X3",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x4",
+    "nameEn": "X4",
+    "nameAr": "X4",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x5",
+    "nameEn": "X5",
+    "nameAr": "X5",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x6",
+    "nameEn": "X6",
+    "nameAr": "X6",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "x7",
+    "nameEn": "X7",
+    "nameAr": "X7",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "bmw",
+    "code": "z4",
+    "nameEn": "Z4",
+    "nameAr": "Z4",
+    "market": "SA",
+    "status": "verified",
+    "source": "bmw-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "ct5",
+    "nameEn": "CT5",
+    "nameAr": "CT5",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "ct5-v",
+    "nameEn": "CT5-V",
+    "nameAr": "CT5-V",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "ct5-v-blackwing",
+    "nameEn": "CT5-V Blackwing",
+    "nameAr": "CT5-V بلاك وينج",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "escalade",
+    "nameEn": "Escalade",
+    "nameAr": "إسكاليد",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "escalade-iq",
+    "nameEn": "Escalade IQ",
+    "nameAr": "إسكاليد IQ",
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "escalade-v",
+    "nameEn": "Escalade-V",
+    "nameAr": "إسكاليد V",
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "lyriq",
+    "nameEn": "LYRIQ",
+    "nameAr": "ليريك",
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "optiq",
+    "nameEn": "OPTIQ",
+    "nameAr": "أوبتيك",
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "xt4",
+    "nameEn": "XT4",
+    "nameAr": "XT4",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "xt5",
+    "nameEn": "XT5",
+    "nameAr": "XT5",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "cadillac",
+    "code": "xt6",
+    "nameEn": "XT6",
+    "nameAr": "XT6",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "cadillac-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "chevrolet",
+    "code": "captiva",
+    "nameEn": "Captiva",
+    "nameAr": "كابتيفا",
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "chevrolet",
+    "code": "corvette",
+    "nameEn": "Corvette",
+    "nameAr": "كورفيت",
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "parts_supported"
+  },
+  {
+    "make": "chevrolet",
+    "code": "groove",
+    "nameEn": "Groove",
+    "nameAr": "جروف",
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "chevrolet",
+    "code": "silverado",
+    "nameEn": "Silverado",
+    "nameAr": "سيلفرادو",
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "current_or_parts_supported"
+  },
+  {
+    "make": "chevrolet",
+    "code": "silverado-hd",
+    "nameEn": "Silverado HD",
+    "nameAr": "سيلفرادو HD",
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "parts_supported"
+  },
+  {
+    "make": "chevrolet",
+    "code": "suburban",
+    "nameEn": "Suburban",
+    "nameAr": "سوبربان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "chevrolet",
+    "code": "tahoe",
+    "nameEn": "Tahoe",
+    "nameAr": "تاهو",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "chevrolet",
+    "code": "traverse",
+    "nameEn": "Traverse",
+    "nameAr": "ترافيرس",
+    "market": "SA",
+    "status": "verified",
+    "source": "chevrolet-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "dodge",
+    "code": "challenger",
+    "nameEn": "Challenger",
+    "nameAr": "تشالنجر",
+    "market": "SA",
+    "status": "verified",
+    "source": "dodge-sa",
+    "sourceType": "parts_supported"
+  },
+  {
+    "make": "dodge",
+    "code": "charger",
+    "nameEn": "Charger",
+    "nameAr": "تشارجر",
+    "market": "SA",
+    "status": "verified",
+    "source": "dodge-sa",
+    "sourceType": "parts_supported"
+  },
+  {
+    "make": "dodge",
+    "code": "durango",
+    "nameEn": "Durango",
+    "nameAr": "دورانجو",
+    "market": "SA",
+    "status": "verified",
+    "source": "dodge-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ferrari",
+    "code": "296-gtb",
+    "nameEn": "296 GTB",
+    "nameAr": "296 GTB",
+    "market": "SA",
+    "status": "verified",
+    "source": "ferrari-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "ferrari",
+    "code": "296-gts",
+    "nameEn": "296 GTS",
+    "nameAr": "296 GTS",
+    "market": "SA",
+    "status": "verified",
+    "source": "ferrari-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "ferrari",
+    "code": "purosangue",
+    "nameEn": "Purosangue",
+    "nameAr": "بوروسانجوي",
+    "market": "SA",
+    "status": "verified",
+    "source": "ferrari-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "ferrari",
+    "code": "roma-spider",
+    "nameEn": "Roma Spider",
+    "nameAr": "روما سبايدر",
+    "market": "SA",
+    "status": "verified",
+    "source": "ferrari-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "fiat",
+    "code": "500e",
+    "nameEn": "500e",
+    "nameAr": "500e",
+    "market": "SA",
+    "status": "verified",
+    "source": "fiat-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "fiat",
+    "code": "doblo",
+    "nameEn": "Doblo",
+    "nameAr": "دوبلو",
+    "market": "SA",
+    "status": "verified",
+    "source": "fiat-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "fiat",
+    "code": "ducato",
+    "nameEn": "Ducato",
+    "nameAr": "دوكاتو",
+    "market": "SA",
+    "status": "verified",
+    "source": "fiat-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "fiat",
+    "code": "scudo",
+    "nameEn": "Scudo",
+    "nameAr": "سكودو",
+    "market": "SA",
+    "status": "verified",
+    "source": "fiat-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "bronco",
+    "nameEn": "Bronco",
+    "nameAr": "برونكو",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "bronco-raptor",
+    "nameEn": "Bronco Raptor",
+    "nameAr": "برونكو رابتر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "everest",
+    "nameEn": "Everest",
+    "nameAr": "إيفرست",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "expedition",
+    "nameEn": "Expedition",
+    "nameAr": "إكسبيديشن",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "explorer",
+    "nameEn": "Explorer",
+    "nameAr": "إكسبلورر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "f-150",
+    "nameEn": "F-150",
+    "nameAr": "F-150",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "mustang",
+    "nameEn": "Mustang",
+    "nameAr": "موستانج",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "mustang-mach-e",
+    "nameEn": "Mustang Mach-E",
+    "nameAr": "موستانج ماك-E",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "ranger",
+    "nameEn": "Ranger",
+    "nameAr": "رينجر",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "ranger-raptor",
+    "nameEn": "Ranger Raptor",
+    "nameAr": "رينجر رابتر",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "super-duty",
+    "nameEn": "Super Duty",
+    "nameAr": "سوبر ديوتي",
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "taurus",
+    "nameEn": "Taurus",
+    "nameAr": "توروس",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "territory",
+    "nameEn": "Territory",
+    "nameAr": "تيريتوري",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ford",
+    "code": "transit",
+    "nameEn": "Transit",
+    "nameAr": "ترانزيت",
+    "market": "SA",
+    "status": "verified",
+    "source": "ford-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "genesis",
+    "code": "electrified-g80",
+    "nameEn": "Electrified G80",
+    "nameAr": "G80 الكهربائية",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "electrified-gv70",
+    "nameEn": "Electrified GV70",
+    "nameAr": "GV70 الكهربائية",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "g70",
+    "nameEn": "G70",
+    "nameAr": "G70",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "g70-shooting-brake",
+    "nameEn": "G70 Shooting Brake",
+    "nameAr": "G70 شوتنج بريك",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "g80",
+    "nameEn": "G80",
+    "nameAr": "G80",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "g90",
+    "nameEn": "G90",
+    "nameAr": "G90",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "gv60",
+    "nameEn": "GV60",
+    "nameAr": "GV60",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "gv70",
+    "nameEn": "GV70",
+    "nameAr": "GV70",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "gv80",
+    "nameEn": "GV80",
+    "nameAr": "GV80",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "genesis",
+    "code": "gv80-coupe",
+    "nameEn": "GV80 Coupe",
+    "nameAr": "GV80 كوبيه",
+    "market": "SA",
+    "status": "verified",
+    "source": "genesis-sa"
+  },
+  {
+    "make": "gmc",
+    "code": "acadia",
+    "nameEn": "Acadia",
+    "nameAr": "أكاديا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "canyon",
+    "nameEn": "Canyon",
+    "nameAr": "كانيون",
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "hummer-ev",
+    "nameEn": "Hummer EV",
+    "nameAr": "هامر EV",
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "savana",
+    "nameEn": "Savana",
+    "nameAr": "سافانا",
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "sierra",
+    "nameEn": "Sierra LD",
+    "nameAr": "سييرا LD",
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "sierra-hd",
+    "nameEn": "Sierra HD",
+    "nameAr": "سييرا HD",
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "terrain",
+    "nameEn": "Terrain",
+    "nameAr": "تيرين",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "yukon",
+    "nameEn": "Yukon",
+    "nameAr": "يوكن",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "gmc",
+    "code": "yukon-xl",
+    "nameEn": "Yukon XL",
+    "nameAr": "يوكن XL",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "gmc-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "honda",
+    "code": "accord",
+    "nameEn": "Accord",
+    "nameAr": "أكورد",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "accord-ehev",
+    "nameEn": "Accord e:HEV",
+    "nameAr": "أكورد e:HEV",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "city",
+    "nameEn": "City",
+    "nameAr": "سيتي",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "civic",
+    "nameEn": "Civic",
+    "nameAr": "سيفيك",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "civic-type-r",
+    "nameEn": "Civic Type R",
+    "nameAr": "سيفيك تايب R",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "cr-v",
+    "nameEn": "CR-V",
+    "nameAr": "CR-V",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "hr-v",
+    "nameEn": "HR-V",
+    "nameAr": "HR-V",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "odyssey",
+    "nameEn": "Odyssey",
+    "nameAr": "أوديسي",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "pilot",
+    "nameEn": "Pilot",
+    "nameAr": "بايلوت",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "honda",
+    "code": "zr-v",
+    "nameEn": "ZR-V",
+    "nameAr": "ZR-V",
+    "market": "SA",
+    "status": "verified",
+    "source": "honda-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "accent",
+    "nameEn": "Accent",
+    "nameAr": "أكسنت",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "azera",
+    "nameEn": "Azera",
+    "nameAr": "أزيرا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "creta",
+    "nameEn": "Creta",
+    "nameAr": "كريتا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "creta-grand",
+    "nameEn": "Creta Grand",
+    "nameAr": "كريتا جراند",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "elantra",
+    "nameEn": "Elantra",
+    "nameAr": "إلنترا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "grand-i10",
+    "nameEn": "Grand i10",
+    "nameAr": "جراند i10",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "kona",
+    "nameEn": "Kona",
+    "nameAr": "كونا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "palisade",
+    "nameEn": "Palisade",
+    "nameAr": "باليسيد",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "santa-fe",
+    "nameEn": "Santa Fe",
+    "nameAr": "سانتافي",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "sonata",
+    "nameEn": "Sonata",
+    "nameAr": "سوناتا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "stargazer",
+    "nameEn": "Stargazer",
+    "nameAr": "ستارجايزر",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "staria-premium",
+    "nameEn": "Staria Premium",
+    "nameAr": "ستاريا بريميوم",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "staria-van",
+    "nameEn": "Staria Van",
+    "nameAr": "ستاريا فان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "staria-wagon",
+    "nameEn": "Staria Wagon",
+    "nameAr": "ستاريا واجن",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "tucson",
+    "nameEn": "Tucson",
+    "nameAr": "توسان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "hyundai",
+    "code": "venue",
+    "nameEn": "Venue",
+    "nameAr": "فينيو",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "hyundai-sa"
+  },
+  {
+    "make": "isuzu",
+    "code": "d-max",
+    "nameEn": "D-MAX",
+    "nameAr": "دي-ماكس",
+    "market": "SA",
+    "status": "verified",
+    "source": "isuzu-sa"
+  },
+  {
+    "make": "isuzu",
+    "code": "f-series",
+    "nameEn": "F-Series",
+    "nameAr": "سلسلة F",
+    "market": "SA",
+    "status": "verified",
+    "source": "isuzu-sa"
+  },
+  {
+    "make": "isuzu",
+    "code": "mu-x",
+    "nameEn": "MU-X",
+    "nameAr": "إم يو-إكس",
+    "market": "SA",
+    "status": "verified",
+    "source": "isuzu-sa"
+  },
+  {
+    "make": "isuzu",
+    "code": "n-series",
+    "nameEn": "N-Series",
+    "nameAr": "سلسلة N",
+    "market": "SA",
+    "status": "verified",
+    "source": "isuzu-sa"
+  },
+  {
+    "make": "isuzu",
+    "code": "se-series",
+    "nameEn": "S&E Series",
+    "nameAr": "سلسلة S&E",
+    "market": "SA",
+    "status": "verified",
+    "source": "isuzu-sa"
+  },
+  {
+    "make": "jaguar",
+    "code": "e-pace",
+    "nameEn": "E-PACE",
+    "nameAr": "E-PACE",
+    "year": 2024,
+    "market": "SA",
+    "status": "verified",
+    "source": "jaguar-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "jaguar",
+    "code": "f-pace",
+    "nameEn": "F-PACE",
+    "nameAr": "F-PACE",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "jaguar-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "jaguar",
+    "code": "f-type",
+    "nameEn": "F-TYPE",
+    "nameAr": "F-TYPE",
+    "year": 2024,
+    "market": "SA",
+    "status": "verified",
+    "source": "jaguar-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "jaguar",
+    "code": "i-pace",
+    "nameEn": "I-PACE",
+    "nameAr": "I-PACE",
+    "year": 2024,
+    "market": "SA",
+    "status": "verified",
+    "source": "jaguar-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "jaguar",
+    "code": "xe",
+    "nameEn": "XE",
+    "nameAr": "XE",
+    "market": "SA",
+    "status": "verified",
+    "source": "jaguar-sa",
+    "sourceType": "parts_supported"
+  },
+  {
+    "make": "jaguar",
+    "code": "xf",
+    "nameEn": "XF",
+    "nameAr": "XF",
+    "market": "SA",
+    "status": "verified",
+    "source": "jaguar-sa",
+    "sourceType": "parts_supported"
+  },
+  {
+    "make": "jeep",
+    "code": "commander",
+    "nameEn": "Commander",
+    "nameAr": "كوماندر",
+    "market": "SA",
+    "status": "verified",
+    "source": "jeep-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "jeep",
+    "code": "grand-cherokee",
+    "nameEn": "Grand Cherokee",
+    "nameAr": "جراند شيروكي",
+    "market": "SA",
+    "status": "verified",
+    "source": "jeep-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "jeep",
+    "code": "grand-wagoneer",
+    "nameEn": "Grand Wagoneer",
+    "nameAr": "جراند واجونير",
+    "market": "SA",
+    "status": "verified",
+    "source": "jeep-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "jeep",
+    "code": "wrangler",
+    "nameEn": "Wrangler",
+    "nameAr": "رانجلر",
+    "market": "SA",
+    "status": "verified",
+    "source": "jeep-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "kia",
+    "code": "cadenza",
+    "nameEn": "Cadenza",
+    "nameAr": "كادينزا",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "carens",
+    "nameEn": "Carens",
+    "nameAr": "كارينز",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "carnival",
+    "nameEn": "Carnival",
+    "nameAr": "كرنفال",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "cerato",
+    "nameEn": "Cerato",
+    "nameAr": "سيراتو",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "ev5",
+    "nameEn": "EV5",
+    "nameAr": "EV5",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "ev6",
+    "nameEn": "EV6",
+    "nameAr": "EV6",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "ev9",
+    "nameEn": "EV9",
+    "nameAr": "EV9",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "k3",
+    "nameEn": "K3",
+    "nameAr": "K3",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "k4",
+    "nameEn": "K4",
+    "nameAr": "K4",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "k4000g",
+    "nameEn": "K4000G",
+    "nameAr": "K4000G",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "k5",
+    "nameEn": "K5",
+    "nameAr": "K5",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "k8",
+    "nameEn": "K8",
+    "nameAr": "K8",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "pegas",
+    "nameEn": "Pegas",
+    "nameAr": "بيجاس",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "picanto",
+    "nameEn": "Picanto",
+    "nameAr": "بيكانتو",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "pv5-cargo",
+    "nameEn": "PV5 Cargo",
+    "nameAr": "PV5 Cargo",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "pv5-passenger",
+    "nameEn": "PV5 Passenger",
+    "nameAr": "PV5 Passenger",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "seltos",
+    "nameEn": "Seltos",
+    "nameAr": "سيلتوس",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "sonet",
+    "nameEn": "Sonet",
+    "nameAr": "سونيت",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "sorento",
+    "nameEn": "Sorento",
+    "nameAr": "سورينتو",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "sportage",
+    "nameEn": "Sportage",
+    "nameAr": "سبورتاج",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "sportage-l",
+    "nameEn": "Sportage L",
+    "nameAr": "سبورتاج L",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "stinger",
+    "nameEn": "Stinger",
+    "nameAr": "ستينجر",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "tasman",
+    "nameEn": "Tasman",
+    "nameAr": "تاسمان",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "kia",
+    "code": "telluride",
+    "nameEn": "Telluride",
+    "nameAr": "تيلورايد",
+    "market": "SA",
+    "status": "verified",
+    "source": "kia-aljabr"
+  },
+  {
+    "make": "lamborghini",
+    "code": "revuelto",
+    "nameEn": "Revuelto",
+    "nameAr": "ريفويلتو",
+    "market": "SA",
+    "status": "verified",
+    "source": "lamborghini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "lamborghini",
+    "code": "temerario",
+    "nameEn": "Temerario",
+    "nameAr": "تيميراريو",
+    "market": "SA",
+    "status": "verified",
+    "source": "lamborghini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "lamborghini",
+    "code": "urus",
+    "nameEn": "Urus",
+    "nameAr": "أوروس",
+    "market": "SA",
+    "status": "verified",
+    "source": "lamborghini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "defender-110",
+    "nameEn": "Defender 110",
+    "nameAr": "ديفندر 110",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "defender-130",
+    "nameEn": "Defender 130",
+    "nameAr": "ديفندر 130",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "defender-90",
+    "nameEn": "Defender 90",
+    "nameAr": "ديفندر 90",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "discovery",
+    "nameEn": "Discovery",
+    "nameAr": "ديسكفري",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "discovery-sport",
+    "nameEn": "Discovery Sport",
+    "nameAr": "ديسكفري سبورت",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "range-rover",
+    "nameEn": "Range Rover",
+    "nameAr": "رينج روفر",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "range-rover-evoque",
+    "nameEn": "Range Rover Evoque",
+    "nameAr": "رينج روفر إيفوك",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "range-rover-sport",
+    "nameEn": "Range Rover Sport",
+    "nameAr": "رينج روفر سبورت",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "land-rover",
+    "code": "range-rover-velar",
+    "nameEn": "Range Rover Velar",
+    "nameAr": "رينج روفر فيلار",
+    "market": "SA",
+    "status": "verified",
+    "source": "land-rover-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "lexus",
+    "code": "es",
+    "nameEn": "ES",
+    "nameAr": "ES",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "is",
+    "nameEn": "IS",
+    "nameAr": "IS",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "lc",
+    "nameEn": "LC",
+    "nameAr": "LC",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "ls",
+    "nameEn": "LS",
+    "nameAr": "LS",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "lx",
+    "nameEn": "LX",
+    "nameAr": "LX",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "nx",
+    "nameEn": "NX",
+    "nameAr": "NX",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "rc",
+    "nameEn": "RC",
+    "nameAr": "RC",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "rx",
+    "nameEn": "RX",
+    "nameAr": "RX",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lexus",
+    "code": "ux",
+    "nameEn": "UX",
+    "nameAr": "UX",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "lexus-sa"
+  },
+  {
+    "make": "lincoln",
+    "code": "aviator",
+    "nameEn": "Aviator",
+    "nameAr": "أفياتور",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lincoln-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "lincoln",
+    "code": "corsair",
+    "nameEn": "Corsair",
+    "nameAr": "كورسير",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lincoln-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "lincoln",
+    "code": "nautilus",
+    "nameEn": "Nautilus",
+    "nameAr": "نوتيلوس",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lincoln-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "lincoln",
+    "code": "navigator",
+    "nameEn": "Navigator",
+    "nameAr": "نافيجيتور",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "lincoln-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "maserati",
+    "code": "grancabrio",
+    "nameEn": "GranCabrio",
+    "nameAr": "جران كابريو",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "maserati-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "maserati",
+    "code": "granturismo",
+    "nameEn": "GranTurismo",
+    "nameAr": "جران توريزمو",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "maserati-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "maserati",
+    "code": "grecale",
+    "nameEn": "Grecale",
+    "nameAr": "جريكالي",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "maserati-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "maserati",
+    "code": "gt2-stradale",
+    "nameEn": "GT2 Stradale",
+    "nameAr": "GT2 سترادالي",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "maserati-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "maserati",
+    "code": "mcpura",
+    "nameEn": "MCPURA",
+    "nameAr": "MCPURA",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "maserati-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "maserati",
+    "code": "mcpura-cielo",
+    "nameEn": "MCPURA Cielo",
+    "nameAr": "MCPURA Cielo",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "maserati-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "a-class",
+    "nameEn": "A-Class",
+    "nameAr": "الفئة A",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "c-class",
+    "nameEn": "C-Class",
+    "nameAr": "الفئة C",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "cla",
+    "nameEn": "CLA",
+    "nameAr": "CLA",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "e-class",
+    "nameEn": "E-Class",
+    "nameAr": "الفئة E",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "eqe",
+    "nameEn": "EQE Sedan",
+    "nameAr": "EQE سيدان",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "eqe-suv",
+    "nameEn": "EQE SUV",
+    "nameAr": "EQE SUV",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "eqs",
+    "nameEn": "EQS Sedan",
+    "nameAr": "EQS سيدان",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "eqs-suv",
+    "nameEn": "EQS SUV",
+    "nameAr": "EQS SUV",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "g-class",
+    "nameEn": "G-Class",
+    "nameAr": "الفئة G",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "gla",
+    "nameEn": "GLA",
+    "nameAr": "GLA",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "glb",
+    "nameEn": "GLB",
+    "nameAr": "GLB",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "glc",
+    "nameEn": "GLC",
+    "nameAr": "GLC",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "glc-coupe",
+    "nameEn": "GLC Coupe",
+    "nameAr": "GLC كوبيه",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "gle",
+    "nameEn": "GLE",
+    "nameAr": "GLE",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "gle-coupe",
+    "nameEn": "GLE Coupe",
+    "nameAr": "GLE كوبيه",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "gls",
+    "nameEn": "GLS",
+    "nameAr": "GLS",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "s-class",
+    "nameEn": "S-Class",
+    "nameAr": "الفئة S",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "sl",
+    "nameEn": "SL Roadster",
+    "nameAr": "SL رودستر",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mercedes-benz",
+    "code": "v-class",
+    "nameEn": "V-Class",
+    "nameAr": "الفئة V",
+    "market": "SA",
+    "status": "verified",
+    "source": "mercedes-benz-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mg",
+    "code": "cyberster",
+    "nameEn": "MG Cyberster",
+    "nameAr": "إم جي سايبرستر",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "gt",
+    "nameEn": "MG GT",
+    "nameAr": "إم جي GT",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "hs",
+    "nameEn": "MG HS",
+    "nameAr": "إم جي HS",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "hs-hybrid-plus",
+    "nameEn": "MG HS Hybrid+",
+    "nameAr": "إم جي HS هايبرد+",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "mg3",
+    "nameEn": "MG 3",
+    "nameAr": "إم جي 3",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "mg4-ev",
+    "nameEn": "MG 4 EV",
+    "nameAr": "إم جي 4 الكهربائية",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "mg5",
+    "nameEn": "MG 5",
+    "nameAr": "إم جي 5",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "mg7",
+    "nameEn": "MG 7",
+    "nameAr": "إم جي 7",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "mg8-phev",
+    "nameEn": "MG 8 PHEV",
+    "nameAr": "إم جي 8 PHEV",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "one",
+    "nameEn": "MG ONE",
+    "nameAr": "إم جي ONE",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "rx9",
+    "nameEn": "MG RX9",
+    "nameAr": "إم جي RX9",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mg",
+    "code": "zs",
+    "nameEn": "MG ZS",
+    "nameAr": "إم جي ZS",
+    "market": "SA",
+    "status": "verified",
+    "source": "mg-sa"
+  },
+  {
+    "make": "mini",
+    "code": "aceman",
+    "nameEn": "Aceman",
+    "nameAr": "أيسمان",
+    "market": "SA",
+    "status": "verified",
+    "source": "mini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mini",
+    "code": "convertible",
+    "nameEn": "Convertible",
+    "nameAr": "كونفرتبل",
+    "market": "SA",
+    "status": "verified",
+    "source": "mini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mini",
+    "code": "cooper",
+    "nameEn": "Cooper",
+    "nameAr": "كوبر",
+    "market": "SA",
+    "status": "verified",
+    "source": "mini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mini",
+    "code": "cooper-5-door",
+    "nameEn": "Cooper 5-Door",
+    "nameAr": "كوبر 5 أبواب",
+    "market": "SA",
+    "status": "verified",
+    "source": "mini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mini",
+    "code": "countryman",
+    "nameEn": "Countryman",
+    "nameAr": "كانتريمان",
+    "market": "SA",
+    "status": "verified",
+    "source": "mini-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "asx",
+    "nameEn": "ASX",
+    "nameAr": "ASX",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "destinator",
+    "nameEn": "Destinator",
+    "nameAr": "ديستينيتور",
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "eclipse-cross",
+    "nameEn": "Eclipse Cross",
+    "nameAr": "إكليبس كروس",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "l200",
+    "nameEn": "L200",
+    "nameAr": "L200",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "montero-sport",
+    "nameEn": "Montero Sport",
+    "nameAr": "مونتيرو سبورت",
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "outlander",
+    "nameEn": "Outlander",
+    "nameAr": "أوتلاندر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "xpander",
+    "nameEn": "Xpander",
+    "nameAr": "إكسباندر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "mitsubishi",
+    "code": "xpander-cross",
+    "nameEn": "Xpander Cross",
+    "nameAr": "إكسباندر كروس",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "mitsubishi-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "altima",
+    "nameEn": "Altima",
+    "nameAr": "ألتيما",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "kicks",
+    "nameEn": "Kicks",
+    "nameAr": "كيكس",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "magnite",
+    "nameEn": "Magnite",
+    "nameAr": "ماجنايت",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "pathfinder",
+    "nameEn": "Pathfinder",
+    "nameAr": "باثفايندر",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "patrol",
+    "nameEn": "Patrol",
+    "nameAr": "باترول",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "patrol-nismo",
+    "nameEn": "Patrol NISMO",
+    "nameAr": "باترول نيسمو",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "patrol-pro-4x",
+    "nameEn": "Patrol PRO-4X",
+    "nameAr": "باترول PRO-4X",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "x-terra",
+    "nameEn": "X-Terra",
+    "nameAr": "إكس-تيرا",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "x-trail",
+    "nameEn": "X-Trail",
+    "nameAr": "إكس-تريل",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "nissan",
+    "code": "z",
+    "nameEn": "Z",
+    "nameAr": "Z",
+    "market": "SA",
+    "status": "verified",
+    "source": "nissan-sa"
+  },
+  {
+    "make": "peugeot",
+    "code": "2008",
+    "nameEn": "2008",
+    "nameAr": "2008",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "3008",
+    "nameEn": "3008",
+    "nameAr": "3008",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "408",
+    "nameEn": "408",
+    "nameAr": "408",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "5008",
+    "nameEn": "5008",
+    "nameAr": "5008",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "boxer",
+    "nameEn": "Boxer",
+    "nameAr": "بوكسر",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "expert",
+    "nameEn": "Expert",
+    "nameAr": "إكسبرت",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "landtrek",
+    "nameEn": "Landtrek",
+    "nameAr": "لاندتريك",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "partner",
+    "nameEn": "Partner",
+    "nameAr": "بارتنر",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "peugeot",
+    "code": "traveller",
+    "nameEn": "Traveller",
+    "nameAr": "ترافلر",
+    "market": "SA",
+    "status": "verified",
+    "source": "peugeot-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "718",
+    "nameEn": "718",
+    "nameAr": "718",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "911",
+    "nameEn": "911",
+    "nameAr": "911",
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "cayenne",
+    "nameEn": "Cayenne",
+    "nameAr": "كايين",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "macan",
+    "nameEn": "Macan",
+    "nameAr": "ماكان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "macan-electric",
+    "nameEn": "Macan Electric",
+    "nameAr": "ماكان الكهربائية",
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "panamera",
+    "nameEn": "Panamera",
+    "nameAr": "باناميرا",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "porsche",
+    "code": "taycan",
+    "nameEn": "Taycan",
+    "nameAr": "تايكان",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "porsche-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ram",
+    "code": "1500",
+    "nameEn": "RAM 1500",
+    "nameAr": "رام 1500",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "ram-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "ram",
+    "code": "2500",
+    "nameEn": "RAM 2500",
+    "nameAr": "رام 2500",
+    "market": "SA",
+    "status": "verified",
+    "source": "ram-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "renault",
+    "code": "arkana",
+    "nameEn": "Arkana",
+    "nameAr": "أركانا",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "renault-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "renault",
+    "code": "duster",
+    "nameEn": "Duster",
+    "nameAr": "داستر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "renault-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "renault",
+    "code": "express-van",
+    "nameEn": "Express Van",
+    "nameAr": "إكسبرس فان",
+    "market": "SA",
+    "status": "verified",
+    "source": "renault-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "renault",
+    "code": "koleos",
+    "nameEn": "Koleos",
+    "nameAr": "كوليوس",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "renault-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "renault",
+    "code": "master",
+    "nameEn": "Master",
+    "nameAr": "ماستر",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "renault-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "renault",
+    "code": "megane-sedan",
+    "nameEn": "Megane Sedan",
+    "nameAr": "ميجان سيدان",
+    "market": "SA",
+    "status": "verified",
+    "source": "renault-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "rolls-royce",
+    "code": "cullinan",
+    "nameEn": "Cullinan",
+    "nameAr": "كالينان",
+    "market": "SA",
+    "status": "verified",
+    "source": "rolls-royce-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "rolls-royce",
+    "code": "ghost",
+    "nameEn": "Ghost",
+    "nameAr": "جوست",
+    "market": "SA",
+    "status": "verified",
+    "source": "rolls-royce-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "rolls-royce",
+    "code": "phantom",
+    "nameEn": "Phantom",
+    "nameAr": "فانتوم",
+    "market": "SA",
+    "status": "verified",
+    "source": "rolls-royce-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "rolls-royce",
+    "code": "spectre",
+    "nameEn": "Spectre",
+    "nameAr": "سبيكتر",
+    "market": "SA",
+    "status": "verified",
+    "source": "rolls-royce-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "skoda",
+    "code": "karoq",
+    "nameEn": "Karoq",
+    "nameAr": "كاروك",
+    "market": "SA",
+    "status": "verified",
+    "source": "skoda-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "skoda",
+    "code": "kodiaq",
+    "nameEn": "Kodiaq",
+    "nameAr": "كودياك",
+    "market": "SA",
+    "status": "verified",
+    "source": "skoda-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "skoda",
+    "code": "kushaq",
+    "nameEn": "Kushaq",
+    "nameAr": "كوشاك",
+    "market": "SA",
+    "status": "verified",
+    "source": "skoda-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "skoda",
+    "code": "octavia",
+    "nameEn": "Octavia",
+    "nameAr": "أوكتافيا",
+    "market": "SA",
+    "status": "verified",
+    "source": "skoda-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "skoda",
+    "code": "slavia",
+    "nameEn": "Slavia",
+    "nameAr": "سلافيا",
+    "market": "SA",
+    "status": "verified",
+    "source": "skoda-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "skoda",
+    "code": "superb",
+    "nameEn": "Superb",
+    "nameAr": "سوبيرب",
+    "market": "SA",
+    "status": "verified",
+    "source": "skoda-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "toyota",
+    "code": "camry",
+    "nameEn": "Camry",
+    "nameAr": "كامري",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "coaster",
+    "nameEn": "Coaster",
+    "nameAr": "كوستر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "corolla",
+    "nameEn": "Corolla",
+    "nameAr": "كورولا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "corolla-cross",
+    "nameEn": "Corolla Cross",
+    "nameAr": "كورولا كروس",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "crown",
+    "nameEn": "Crown",
+    "nameAr": "كراون",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "fortuner",
+    "nameEn": "Fortuner",
+    "nameAr": "فورتشنر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "gr86",
+    "nameEn": "GR86",
+    "nameAr": "جي آر 86",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "hiace-bus",
+    "nameEn": "Hiace Bus",
+    "nameAr": "هايس باص",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "hiace-van",
+    "nameEn": "Hiace Van",
+    "nameAr": "هايس فان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "highlander",
+    "nameEn": "Highlander",
+    "nameAr": "هايلاندر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "hilux-double-cab",
+    "nameEn": "Hilux Double Cab",
+    "nameAr": "هايلكس غمارتين",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "hilux-single-cab",
+    "nameEn": "Hilux Single Cab",
+    "nameAr": "هايلكس غمارة",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "innova",
+    "nameEn": "Innova",
+    "nameAr": "إنوفا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "land-cruiser",
+    "nameEn": "Land Cruiser",
+    "nameAr": "لاند كروزر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "land-cruiser-hardtop",
+    "nameEn": "Land Cruiser Hardtop",
+    "nameAr": "لاند كروزر هاردتوب",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "land-cruiser-hev-max",
+    "nameEn": "Land Cruiser HEV MAX",
+    "nameAr": "لاند كروزر HEV MAX",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "land-cruiser-pickup",
+    "nameEn": "Land Cruiser Pickup",
+    "nameAr": "لاند كروزر بيك أب",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "liteace-van",
+    "nameEn": "Liteace Van",
+    "nameAr": "لايت إيس فان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "prado",
+    "nameEn": "Prado",
+    "nameAr": "برادو",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "raize",
+    "nameEn": "Raize",
+    "nameAr": "رايز",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "rav4",
+    "nameEn": "RAV4",
+    "nameAr": "راف فور",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "supra",
+    "nameEn": "Supra",
+    "nameAr": "سوبرا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "urban-cruiser",
+    "nameEn": "Urban Cruiser",
+    "nameAr": "أوربان كروزر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "veloz",
+    "nameEn": "Veloz",
+    "nameAr": "فيلوز",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "toyota",
+    "code": "yaris",
+    "nameEn": "Yaris",
+    "nameAr": "يارس",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "toyota-sa"
+  },
+  {
+    "make": "volkswagen",
+    "code": "amarok",
+    "nameEn": "Amarok",
+    "nameAr": "أماروك",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "crafter",
+    "nameEn": "Crafter",
+    "nameAr": "كرافتر",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "golf-gti",
+    "nameEn": "Golf GTI",
+    "nameAr": "جولف GTI",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "jetta",
+    "nameEn": "Jetta",
+    "nameAr": "جيتا",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "passat",
+    "nameEn": "Passat",
+    "nameAr": "باسات",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "teramont",
+    "nameEn": "Teramont",
+    "nameAr": "تيرامونت",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "tiguan",
+    "nameEn": "Tiguan",
+    "nameAr": "تيجوان",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volkswagen",
+    "code": "touareg",
+    "nameEn": "Touareg",
+    "nameAr": "طوارق",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volkswagen-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volvo",
+    "code": "ec40",
+    "nameEn": "EC40",
+    "nameAr": "EC40",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "volvo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volvo",
+    "code": "ex30",
+    "nameEn": "EX30",
+    "nameAr": "EX30",
+    "year": 2026,
+    "market": "SA",
+    "status": "verified",
+    "source": "volvo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volvo",
+    "code": "ex40",
+    "nameEn": "EX40",
+    "nameAr": "EX40",
+    "year": 2025,
+    "market": "SA",
+    "status": "verified",
+    "source": "volvo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volvo",
+    "code": "xc40",
+    "nameEn": "XC40",
+    "nameAr": "XC40",
+    "market": "SA",
+    "status": "verified",
+    "source": "volvo-sa",
+    "sourceType": "current_or_supported"
+  },
+  {
+    "make": "volvo",
+    "code": "xc60",
+    "nameEn": "XC60",
+    "nameAr": "XC60",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "volvo-sa",
+    "sourceType": "current_lineup"
+  },
+  {
+    "make": "volvo",
+    "code": "xc90",
+    "nameEn": "XC90",
+    "nameAr": "XC90",
+    "year": 2027,
+    "market": "SA",
+    "status": "verified",
+    "source": "volvo-sa",
+    "sourceType": "current_lineup"
+  }
+]

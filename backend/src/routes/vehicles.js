@@ -1,7 +1,17 @@
+import { readFileSync } from "node:fs";
 import { pool } from "../db/pool.js";
 import { createSafeRouter } from "../utils/safe-router.js";
 
 const router = createSafeRouter();
+
+const saudiVehicleMakes = Object.freeze(
+  JSON.parse(
+    readFileSync(
+      new URL("../data/saudi-vehicle-makes.json", import.meta.url),
+      "utf8"
+    )
+  ).map((make) => Object.freeze({ ...make }))
+);
 
 export function normalizeVin(value) {
   const vin = String(value || "").trim().toUpperCase();
@@ -12,6 +22,14 @@ function validYear(value) {
   const year = Number(value);
   return Number.isInteger(year) && year >= 1900 && year <= new Date().getFullYear() + 1;
 }
+
+router.get("/catalog/makes", (_req, res) => {
+  res.json({
+    market: "SA",
+    count: saudiVehicleMakes.length,
+    makes: saudiVehicleMakes,
+  });
+});
 
 router.get("/", async (req, res) => {
   const result = await pool.query(

@@ -80,6 +80,29 @@ router.post("/saudi-starter/import", async (req, res) => {
   }
 });
 
+router.get("/parts/:partId/applications", async (req, res) => {
+  const part = await pool.query(
+    "SELECT id FROM parts WHERE id = $1 AND organization_id = $2",
+    [req.params.partId, req.user.organizationId]
+  );
+
+  if (!part.rows[0]) {
+    return res.status(404).json({ error: "part_not_found" });
+  }
+
+  const result = await pool.query(
+    `SELECT id, part_id, make, model, year_from, year_to, engine, trim,
+            market, source, verification_status
+     FROM vehicle_applications
+     WHERE organization_id = $1
+       AND part_id = $2
+     ORDER BY make, model, year_from NULLS FIRST, id`,
+    [req.user.organizationId, req.params.partId]
+  );
+
+  res.json(result.rows);
+});
+
 router.post("/parts/:partId/applications", async (req, res) => {
   const body = req.body || {};
   const make = String(body.make || "").trim();
@@ -108,6 +131,46 @@ router.post("/parts/:partId/applications", async (req, res) => {
       String(body.trim || "").trim().slice(0, 100) || null]
   );
   res.status(201).json(result.rows[0]);
+});
+
+router.patch("/applications/:applicationId/status", async (req, res) => {
+  const status = String(req.body?.status || "").trim().toLowerCase();
+
+  if (!["unverified", "verified", "rejected"].includes(status)) {
+    return res.status(400).json({ error: "invalid_verification_status" });
+  }
+
+  const result = await pool.query(
+    `UPDATE vehicle_applications
+     SET verification_status = $1
+     WHERE id = $2
+       AND organization_id = $3
+     RETURNING id, part_id, make, model, year_from, year_to, engine, trim,
+               market, source, verification_status`,
+    [status, req.params.applicationId, req.user.organizationId]
+  );
+
+  if (!result.rows[0]) {
+    return res.status(404).json({ error: "application_not_found" });
+  }
+
+  res.json(result.rows[0]);
+});
+
+router.delete("/applications/:applicationId", async (req, res) => {
+  const result = await pool.query(
+    `DELETE FROM vehicle_applications
+     WHERE id = $1
+       AND organization_id = $2
+     RETURNING id`,
+    [req.params.applicationId, req.user.organizationId]
+  );
+
+  if (!result.rows[0]) {
+    return res.status(404).json({ error: "application_not_found" });
+  }
+
+  res.json({ ok: true });
 });
 
 export default router;

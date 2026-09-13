@@ -109,9 +109,15 @@ export async function changePassword(currentPassword, newPassword) {
   return res.json();
 }
 
-export async function searchParts(q, type = "name") {
-  // every shop's catalog is private now (multi-tenant), so this requires login
-  const res = await apiFetch(`${BASE}/parts/search?q=${encodeURIComponent(q)}&type=${type}`, {
+export async function searchParts(q, type = "all") {
+  // The server remains the authority for tenant/role scoping.
+  // URLSearchParams safely encodes both the query and search type.
+  const params = new URLSearchParams({
+    q: String(q ?? "").trim(),
+    type: String(type || "all"),
+  });
+
+  const res = await apiFetch(`${BASE}/parts/search?${params.toString()}`, {
     headers: authHeaders(),
   });
   return res.json();
@@ -470,6 +476,39 @@ export async function importSaudiStarterCatalog() {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ confirm: true }),
+  });
+  return res.json();
+}
+
+export async function getPartApplications(partId) {
+  const res = await apiFetch(`${BASE}/catalog/parts/${partId}/applications`, {
+    headers: authHeaders(),
+  });
+  return res.json();
+}
+
+export async function createPartApplication(partId, payload) {
+  const res = await apiFetch(`${BASE}/catalog/parts/${partId}/applications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export async function updatePartApplicationStatus(applicationId, status) {
+  const res = await apiFetch(`${BASE}/catalog/applications/${applicationId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ status }),
+  });
+  return res.json();
+}
+
+export async function deletePartApplication(applicationId) {
+  const res = await apiFetch(`${BASE}/catalog/applications/${applicationId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
   });
   return res.json();
 }

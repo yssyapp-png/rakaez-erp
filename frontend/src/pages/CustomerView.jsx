@@ -7,7 +7,7 @@ export default function CustomerView({ user }) {
   const paymentsEnabled = import.meta.env.VITE_PAYMENTS_ENABLED === "true";
   const { t } = useLanguage();
   const [q, setQ] = useState("");
-  const [type, setType] = useState("name");
+  const [type, setType] = useState("all");
   const [results, setResults] = useState([]);
   const [cart, setCart] = useState([]); // { partId, name, price, quantity, branchId }
   const [paying, setPaying] = useState(false);
@@ -204,8 +204,11 @@ export default function CustomerView({ user }) {
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <select value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="all">{t("search_all")}</option>
           <option value="name">{t("search_by_name")}</option>
           <option value="pn">{t("search_by_pn")}</option>
+          <option value="oem">{t("search_by_oem")}</option>
+          <option value="barcode">{t("search_by_barcode")}</option>
           <option value="vin">{t("search_by_vin")}</option>
         </select>
         <input
