@@ -62,6 +62,14 @@ app.use((req, res, next) => {
 
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: {
+    action: "deny",
+  },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
