@@ -44,7 +44,7 @@ rakaez-erp/
 الفحوص والبناء من مكان واحد على Node.js 24:
 
 ```bash
-cd "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp"
+cd "/Users/sh/Documents/مجلد البرمجة/rakaez-erp"
 npm run setup
 npm run check
 ```
@@ -72,7 +72,7 @@ psql rakaez < backend/src/db/seed.sql
 
 ### 2) الباك اند
 ```bash
-cd "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp/backend"
+cd "/Users/sh/Documents/مجلد البرمجة/rakaez-erp/backend"
 cp .env.example .env   # عدّل القيم: DATABASE_URL, JWT_SECRET, مفاتيح Moyasar
 npm install
 npm run dev             # http://localhost:4000
@@ -103,7 +103,7 @@ npm run configure:supabase
 
 ### 3) الفرونت اند
 ```bash
-cd "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp/frontend"
+cd "/Users/sh/Documents/مجلد البرمجة/rakaez-erp/frontend"
 npm install
 npm run dev              # http://localhost:5173
 ```

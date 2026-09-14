@@ -9,7 +9,10 @@ final class LauncherDelegate: NSObject, NSApplicationDelegate {
   private var revealButton: NSButton!
   private var process: Process?
 
-  private let generatorPath = "/Users/sh/Documents/Codex/2026-08-10/referenced-chatgpt-conversation-this-is-an/work/rakaez-erp/demo-preview/GENERATE_PROMO_90.command"
+  private let generatorPath = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .appendingPathComponent("GENERATE_PROMO_90.command")
+    .path
   private let outputPath = NSHomeDirectory() + "/Documents/فيديو-ركائز-الدعائي-90-ثانية-بدون-موسيقى.mp4"
 
   func applicationDidFinishLaunching(_ notification: Notification) {

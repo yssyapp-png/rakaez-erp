@@ -26,7 +26,8 @@ RUN npm ci --omit=dev --ignore-scripts
 
 FROM node:24-alpine
 ENV NODE_ENV=production \
-    NODE_OPTIONS=--disable-proto=throw
+    NODE_OPTIONS=--disable-proto=throw \
+    HEALTHCHECK_HOST=rakaezerp.sa
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY backend/package.json backend/package-lock.json ./
@@ -37,5 +38,5 @@ COPY --from=web-build /web/dist ./public
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:4000/api/health',{headers:{'X-Forwarded-Proto':'https','Host':'rakaezerp.com'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:4000/api/health',{headers:{'X-Forwarded-Proto':'https','Host':process.env.HEALTHCHECK_HOST||'rakaezerp.sa'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["node", "src/index.js"]
