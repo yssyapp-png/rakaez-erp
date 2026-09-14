@@ -1,4 +1,4 @@
-FROM node:24-alpine AS web-dependencies
+FROM node:26-alpine AS web-dependencies
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --ignore-scripts
@@ -19,12 +19,12 @@ ENV VITE_MOYASAR_SCRIPT_INTEGRITY=$VITE_MOYASAR_SCRIPT_INTEGRITY
 ENV VITE_MOYASAR_STYLE_INTEGRITY=$VITE_MOYASAR_STYLE_INTEGRITY
 RUN npm run build
 
-FROM node:24-alpine AS dependencies
+FROM node:26-alpine AS dependencies
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
-FROM node:24-alpine
+FROM node:26-alpine
 ENV NODE_ENV=production \
     NODE_OPTIONS=--disable-proto=throw \
     HEALTHCHECK_HOST=rakaezerp.sa
