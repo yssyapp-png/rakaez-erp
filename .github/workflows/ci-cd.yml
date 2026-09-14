@@ -140,6 +140,23 @@ jobs:
         cache: npm
         cache-dependency-path: backend/package-lock.json
     - run: npm ci --ignore-scripts
+    - name: Create Supabase-compatible CI roles
+      run: |
+        node --input-type=module <<'NODE'
+        import pg from "pg";
+
+        const client = new pg.Client({
+          connectionString: process.env.DATABASE_URL,
+        });
+
+        await client.connect();
+        try {
+          await client.query("CREATE ROLE anon NOLOGIN");
+          await client.query("CREATE ROLE authenticated NOLOGIN");
+        } finally {
+          await client.end();
+        }
+        NODE
     - name: Apply every migration to a clean database
       run: npm run migrate
     - name: Verify the migration result
